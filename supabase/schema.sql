@@ -124,8 +124,8 @@ CREATE TABLE admit_cards (
   student_id UUID REFERENCES students(id) ON DELETE CASCADE NOT NULL UNIQUE,
   roll_number VARCHAR(8) NOT NULL UNIQUE, -- 8-Digit Code: YY + D + SSSSS
   exam_date DATE NOT NULL,
-  reporting_time TIME NOT NULL,
-  exam_time TIME NOT NULL,
+  reporting_time VARCHAR NOT NULL,
+  exam_time VARCHAR NOT NULL,
   venue TEXT NOT NULL,
   instructions TEXT,
   qr_code_payload TEXT,

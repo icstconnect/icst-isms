@@ -219,7 +219,7 @@ export const SpecialReg: React.FC = () => {
             <div className="bg-white border-2 border-slate-800 p-6 rounded-lg text-slate-800 shadow-md relative print:shadow-none print:border-slate-800 max-w-lg mx-auto">
               <div className="text-center pb-3 border-b-2 border-slate-800">
                 <h4 className="font-extrabold text-sm uppercase tracking-wider">ICST Scholarship Committee</h4>
-                <div className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mt-0.5">Official Admission Card</div>
+                <div className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mt-0.5">ADMIT CARD</div>
               </div>
 
               <div className="flex justify-between items-start my-4">

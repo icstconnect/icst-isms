@@ -1,16 +1,56 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard } from '../services/mockDb';
-import { FileText, Printer, QrCode } from 'lucide-react';
+import { FileText, Printer, QrCode, Loader2 } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 
 export const AdmitCards: React.FC = () => {
-  const scholarships = mockDb.getData<Scholarship>('scholarships');
-  const schools = mockDb.getData<School>('schools');
-  
-  const [selectedSch, setSelectedSch] = useState(scholarships[0]?.id || '');
-  const [selectedScl, setSelectedScl] = useState('');
-  
-  const [students] = useState<Student[]>(mockDb.getData<Student>('students'));
+  const [dbScholarships, setDbScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
+  const [dbSchools, setDbSchools] = useState<School[]>(mockDb.getData<School>('schools'));
+  const [students, setStudents] = useState<Student[]>(mockDb.getData<Student>('students'));
   const [admitCards, setAdmitCards] = useState<AdmitCard[]>(mockDb.getData<AdmitCard>('admit_cards'));
+  
+  const [selectedSch, setSelectedSch] = useState('');
+  const [selectedScl, setSelectedScl] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch live admit card page details from Supabase on mount
+  useEffect(() => {
+    const fetchLiveDetails = async () => {
+      setIsLoading(true);
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const [schRes, sclRes, stuRes, cardRes] = await Promise.all([
+            supabase.from('scholarships').select('*').order('created_at', { ascending: false }),
+            supabase.from('schools').select('*').order('created_at', { ascending: false }),
+            supabase.from('students').select('*'),
+            supabase.from('admit_cards').select('*')
+          ]);
+
+          if (schRes.error) throw schRes.error;
+          if (sclRes.error) throw sclRes.error;
+          if (stuRes.error) throw stuRes.error;
+          if (cardRes.error) throw cardRes.error;
+
+          if (schRes.data) {
+            setDbScholarships(schRes.data);
+            if (schRes.data.length > 0) setSelectedSch(schRes.data[0].id);
+          }
+          if (sclRes.data) setDbSchools(sclRes.data);
+          if (stuRes.data) setStudents(stuRes.data);
+          if (cardRes.data) setAdmitCards(cardRes.data);
+        } catch (err) {
+          console.error("Error loading live admit card data:", err);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        if (dbScholarships.length > 0) setSelectedSch(dbScholarships[0].id);
+        setIsLoading(false);
+      }
+    };
+    fetchLiveDetails();
+  }, []);
 
   // Filter students who don't have admit cards generated yet
   const studentsWithCardStatus = useMemo(() => {
@@ -22,12 +62,12 @@ export const AdmitCards: React.FC = () => {
       return {
         student: s,
         card,
-        school: schools.find(sch => sch.id === s.school_id)
+        school: dbSchools.find(sch => sch.id === s.school_id)
       };
     });
-  }, [students, admitCards, schools, selectedSch, selectedScl]);
+  }, [students, admitCards, dbSchools, selectedSch, selectedScl]);
 
-  const handleGenerateAll = () => {
+  const handleGenerateAll = async () => {
     // Generate admit cards for all students in the filtered selection who don't have cards yet
     const pendingList = studentsWithCardStatus.filter(item => !item.card);
     if (pendingList.length === 0) {
@@ -35,30 +75,58 @@ export const AdmitCards: React.FC = () => {
       return;
     }
 
-    const currentYear = scholarships.find(s => s.id === selectedSch)?.academic_year || 2026;
-    const generated: AdmitCard[] = [];
+    setIsSaving(true);
+    try {
+      const currentYear = dbScholarships.find(s => s.id === selectedSch)?.academic_year || 2026;
+      const generated: AdmitCard[] = [];
 
-    pendingList.forEach((item) => {
-      // 8 Digit Roll Number: YY + District code (e.g. 1) + sequence
-      const rollSeq = String(admitCards.length + generated.length + 1).padStart(5, '0');
-      const generatedRoll = `${String(currentYear).substring(2, 4)}1${rollSeq.substring(2)}`;
+      const insertData = pendingList.map((item, index) => {
+        // YY + District Code (1) + Roll sequence number
+        const rollSeq = String(admitCards.length + index + 1).padStart(5, '0');
+        const generatedRoll = `${String(currentYear).substring(2, 4)}1${rollSeq.substring(2)}`;
 
-      const newCard = mockDb.addRecord<AdmitCard>('admit_cards', {
-        student_id: item.student.id,
-        roll_number: generatedRoll,
-        exam_date: '2026-06-21',
-        reporting_time: '10:00 AM',
-        exam_time: '11:00 AM - 01:00 PM',
-        venue: item.school ? `${item.school.name} Hall, ${item.school.district}` : 'Main Examination Center',
-        instructions: '1. Bring this Admit Card & School ID card.\n2. Use Black/Blue ballpoint pen only.\n3. Calculator, smartwatches, or mobile phones are strictly prohibited.',
-        qr_code_payload: `https://isms.icstconnect.in/verify/${generatedRoll}`,
-        signature_url: ''
+        return {
+          student_id: item.student.id,
+          roll_number: generatedRoll,
+          exam_date: '2026-06-21',
+          reporting_time: '10:00 AM',
+          exam_time: '11:00 AM - 01:00 PM',
+          venue: item.school ? `${item.school.name} Hall, ${item.school.district}` : 'Main Examination Center',
+          instructions: '1. Bring this Admit Card & School ID card.\n2. Use Black/Blue ballpoint pen only.\n3. Calculator, smartwatches, or mobile phones are strictly prohibited.',
+          qr_code_payload: `https://isms.icstconnect.in/verify/${generatedRoll}`,
+          signature_url: ''
+        };
       });
-      generated.push(newCard);
-    });
 
-    setAdmitCards([...admitCards, ...generated]);
-    alert(`Successfully generated ${generated.length} admit cards.`);
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('admit_cards')
+          .insert(insertData)
+          .select();
+        if (error) throw error;
+        if (data) {
+          data.forEach((card: any) => {
+            mockDb.addRecord<AdmitCard>('admit_cards', card);
+            generated.push(card);
+          });
+        }
+      } else {
+        insertData.forEach(cardData => {
+          const card = mockDb.addRecord<AdmitCard>('admit_cards', {
+            id: `ac-${Date.now()}-${Math.random()}`,
+            ...cardData
+          });
+          generated.push(card);
+        });
+      }
+
+      setAdmitCards([...admitCards, ...generated]);
+      alert(`Successfully generated ${generated.length} admit cards.`);
+    } catch (err: any) {
+      alert("Failed to generate admit cards: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePrintAll = () => {
@@ -78,13 +146,16 @@ export const AdmitCards: React.FC = () => {
         <div className="flex space-x-3">
           <button
             onClick={handleGenerateAll}
-            className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-4 py-2.5 rounded-xl cursor-pointer"
+            disabled={isSaving || isLoading}
+            className="flex items-center text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-50 font-semibold"
           >
-            Generate Pending Cards
+            {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+            {isSaving ? 'Generating...' : 'Generate Pending Cards'}
           </button>
           <button
             onClick={handlePrintAll}
-            className="flex items-center text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl shadow-md cursor-pointer"
+            disabled={isSaving || isLoading}
+            className="flex items-center text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl shadow-md cursor-pointer disabled:opacity-50"
           >
             <Printer className="w-4 h-4 mr-1.5" />
             Bulk Print A4 Layout
@@ -98,10 +169,11 @@ export const AdmitCards: React.FC = () => {
           <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Scholarship Session</label>
           <select
             value={selectedSch}
+            disabled={isLoading}
             onChange={(e) => setSelectedSch(e.target.value)}
-            className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none"
+            className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none disabled:opacity-50"
           >
-            {scholarships.map(s => (
+            {dbScholarships.map(s => (
               <option key={s.id} value={s.id}>{s.name} ({s.academic_year})</option>
             ))}
           </select>
@@ -110,11 +182,12 @@ export const AdmitCards: React.FC = () => {
           <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Filter by School</label>
           <select
             value={selectedScl}
+            disabled={isLoading}
             onChange={(e) => setSelectedScl(e.target.value)}
-            className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none"
+            className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none disabled:opacity-50"
           >
             <option value="">All Schools</option>
-            {schools.map(s => (
+            {dbSchools.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
@@ -177,7 +250,7 @@ export const AdmitCards: React.FC = () => {
                 <div className="w-10 h-10 bg-slate-100 border flex items-center justify-center font-bold text-xs uppercase">Logo</div>
                 <div>
                   <h4 className="font-extrabold text-sm uppercase tracking-wider">ICST Scholarship Examination</h4>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Official Admission Card</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">ADMIT CARD</div>
                 </div>
                 <div className="w-10 h-10 border flex items-center justify-center"><QrCode className="w-8 h-8 text-black" /></div>
               </div>

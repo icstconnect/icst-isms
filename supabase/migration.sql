@@ -21,3 +21,7 @@ ALTER TABLE public.students ADD COLUMN IF NOT EXISTS police_station VARCHAR;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS district VARCHAR;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS state VARCHAR;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS pin_code VARCHAR;
+
+-- Alter admit_cards table column types to VARCHAR to support human-readable time strings (e.g. "10:00 AM", "11:00 AM - 01:00 PM")
+ALTER TABLE public.admit_cards ALTER COLUMN reporting_time TYPE VARCHAR;
+ALTER TABLE public.admit_cards ALTER COLUMN exam_time TYPE VARCHAR;

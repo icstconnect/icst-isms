@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { mockDb, Student, School, Scholarship } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { UserSquare2, Plus, Phone, Calendar, Search, MapPin, MessageSquare, FileText, Loader2 } from 'lucide-react';
+import { UserSquare2, Plus, Phone, Calendar, Search, MapPin, MessageSquare, FileText, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { DatePicker } from '../components/DatePicker';
 
 export const Students: React.FC = () => {
@@ -11,6 +11,8 @@ export const Students: React.FC = () => {
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form Fields based on the Physical Form image
   const [formNoSuffix, setFormNoSuffix] = useState('');
@@ -195,27 +197,103 @@ export const Students: React.FC = () => {
     };
   };
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const clearForm = () => {
+    setFormNoSuffix('');
+    setName('');
+    setGuardianName('');
+    setAadhaarNo('');
+    setDob('');
+    setGender('Male');
+    setVillage('');
+    setPostOffice('');
+    setPoliceStation('');
+    setDistrict('');
+    setState('West Bengal');
+    setPinCode('');
+    setGuardianContact('');
+    setWhatsappNo('');
+    setIsSameContact(false);
+    setSection('A');
+    setSchoolRoll('');
+    setPhotoUrl(null);
+    setEditingStudent(null);
+  };
+
+  const handleStartEdit = (s: Student) => {
+    setEditingStudent(s);
+    
+    // Parse form number prefix
+    if (s.form_number && s.form_number.startsWith('ICST/SE/')) {
+      setFormNoSuffix(s.form_number.replace('ICST/SE/', ''));
+    } else {
+      setFormNoSuffix(s.form_number || '');
+    }
+
+    setName(s.name);
+    setGuardianName(s.guardian_name || '');
+    setAadhaarNo(s.aadhaar_no || '');
+    setDob(s.dob);
+    setGender(s.gender as any);
+    setVillage(s.village || '');
+    setPostOffice(s.post_office || '');
+    setPoliceStation(s.police_station || '');
+    setDistrict(s.district || '');
+    setState(s.state || 'West Bengal');
+    setPinCode(s.pin_code || '');
+    setGuardianContact(s.guardian_contact);
+    setWhatsappNo(s.whatsapp_no || '');
+    setIsSameContact(s.whatsapp_no === s.guardian_contact);
+    setSelectedSch(s.scholarship_id);
+    setSelectedScl(s.school_id);
+    setSection(s.section);
+    setSchoolRoll(s.school_roll_no);
+    setPhotoUrl(s.photo_url || null);
+    
+    setShowAddForm(true);
+    // Scroll window to form view on mobile devices
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this candidate? This will delete all attendance records and marks for this student.")) return;
+
+    setDeletingId(id);
+    try {
+      if (isSupabaseConfigured && supabase) {
+        const { error } = await supabase
+          .from('students')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+      }
+
+      mockDb.deleteRecord('students', id);
+      setStudents(students.filter(s => s.id !== id));
+    } catch (err: any) {
+      alert("Failed to delete candidate: " + err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleAddOrEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !dob || !selectedScl || isSaving) return;
 
     setIsSaving(true);
-    const nextId = `STU-${String(students.length + 1).padStart(6, '0')}`;
     const fullFormNo = formNoSuffix ? `ICST/SE/${formNoSuffix}` : '';
 
-    const newStudentData = {
-      student_id: nextId,
+    const candidateData = {
       scholarship_id: selectedSch,
       school_id: selectedScl,
       name,
       dob,
       gender,
-      class: 'X', // Predetermined class from the form image is "X"
+      class: 'X',
       section,
       school_roll_no: schoolRoll,
       guardian_contact: guardianContact,
-      photo_url: photoUrl, // Pass cropped photo URL
-      is_special_registration: false,
+      photo_url: photoUrl,
       form_number: fullFormNo,
       guardian_name: guardianName,
       aadhaar_no: aadhaarNo,
@@ -230,48 +308,53 @@ export const Students: React.FC = () => {
     };
 
     try {
-      let insertedId = `stu-${Date.now()}`;
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
-          .from('students')
-          .insert(newStudentData)
-          .select()
-          .single();
-        if (error) throw error;
-        if (data) {
-          insertedId = data.id;
+      if (editingStudent) {
+        // Edit Mode
+        if (isSupabaseConfigured && supabase) {
+          const { error } = await supabase
+            .from('students')
+            .update(candidateData)
+            .eq('id', editingStudent.id);
+          if (error) throw error;
         }
+
+        mockDb.updateRecord<Student>('students', editingStudent.id, candidateData);
+        setStudents(students.map(s => s.id === editingStudent.id ? { ...s, ...candidateData } : s));
+        setShowAddForm(false);
+        clearForm();
+      } else {
+        // Add Mode
+        const nextId = `STU-${String(students.length + 1).padStart(6, '0')}`;
+        const newStudentData = {
+          student_id: nextId,
+          is_special_registration: false,
+          ...candidateData
+        };
+
+        let insertedId = `stu-${Date.now()}`;
+        if (isSupabaseConfigured && supabase) {
+          const { data, error } = await supabase
+            .from('students')
+            .insert(newStudentData)
+            .select()
+            .single();
+          if (error) throw error;
+          if (data) {
+            insertedId = data.id;
+          }
+        }
+
+        const newStudent = mockDb.addRecord<Student>('students', {
+          id: insertedId,
+          ...newStudentData
+        });
+
+        setStudents([newStudent, ...students]);
+        setShowAddForm(false);
+        clearForm();
       }
-
-      const newStudent = mockDb.addRecord<Student>('students', {
-        id: insertedId,
-        ...newStudentData
-      });
-
-      setStudents([newStudent, ...students]);
-      setShowAddForm(false);
-
-      // Reset Form Fields
-      setFormNoSuffix('');
-      setName('');
-      setGuardianName('');
-      setAadhaarNo('');
-      setDob('');
-      setGender('Male');
-      setVillage('');
-      setPostOffice('');
-      setPoliceStation('');
-      setDistrict('');
-      setState('West Bengal');
-      setPinCode('');
-      setGuardianContact('');
-      setWhatsappNo('');
-      setIsSameContact(false);
-      setSection('A');
-      setSchoolRoll('');
-      setPhotoUrl(null);
     } catch (err: any) {
-      alert("Failed to register candidate: " + err.message);
+      alert("Failed to save candidate: " + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -306,11 +389,11 @@ export const Students: React.FC = () => {
       </div>
 
       {showAddForm && (
-        <form onSubmit={handleAdd} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm space-y-6 max-w-4xl">
+        <form onSubmit={handleAddOrEdit} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm space-y-6 max-w-4xl">
           <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-100">
             <h3 className="text-lg font-bold text-slate-800 flex items-center">
               <FileText className="w-5 h-5 mr-2 text-blue-600" />
-              Computer Scholarship Application Form 2026
+              {editingStudent ? 'Edit Candidate Details' : 'Computer Scholarship Application Form 2026'}
             </h3>
             
             {/* Form Number with pre-filled prefix */}
@@ -672,7 +755,7 @@ export const Students: React.FC = () => {
               disabled={isSaving}
               onClick={() => {
                 setShowAddForm(false);
-                setFormNoSuffix('');
+                clearForm();
               }}
               className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-base sm:text-sm py-3 sm:py-2 px-5 rounded-xl disabled:opacity-50 font-semibold w-full sm:w-auto"
             >
@@ -684,7 +767,7 @@ export const Students: React.FC = () => {
               className="text-white bg-blue-600 hover:bg-blue-500 text-base sm:text-sm py-3 sm:py-2.5 px-5 rounded-xl shadow font-semibold flex items-center justify-center disabled:opacity-50 w-full sm:w-auto"
             >
               {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
-              {isSaving ? 'Enrolling...' : 'Enroll Candidate'}
+              {isSaving ? (editingStudent ? 'Saving...' : 'Enrolling...') : (editingStudent ? 'Save Changes' : 'Enroll Candidate')}
             </button>
           </div>
         </form>
@@ -732,6 +815,7 @@ export const Students: React.FC = () => {
                   <th className="p-4 font-semibold text-slate-600">DOB / Gender</th>
                   <th className="p-4 font-semibold text-slate-600">Class & Roll</th>
                   <th className="p-4 font-semibold text-slate-600">Guardian Contact</th>
+                  <th className="p-4 font-semibold text-slate-600 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -787,6 +871,30 @@ export const Students: React.FC = () => {
                             WA: {s.whatsapp_no}
                           </div>
                         )}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end space-x-1.5">
+                          <button
+                            onClick={() => handleStartEdit(s)}
+                            disabled={isSaving || deletingId !== null}
+                            title="Edit Candidate"
+                            className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm disabled:opacity-50"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(s.id)}
+                            disabled={deletingId !== null}
+                            title="Delete Candidate"
+                            className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm disabled:opacity-50"
+                          >
+                            {deletingId === s.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -863,6 +971,31 @@ export const Students: React.FC = () => {
                             WhatsApp
                           </a>
                         )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+                      <span className="text-[10px] font-bold text-slate-400">Actions:</span>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleStartEdit(s)}
+                          disabled={isSaving || deletingId !== null}
+                          className="flex items-center text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer disabled:opacity-50"
+                        >
+                          <Pencil className="w-3.5 h-3.5 mr-1" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(s.id)}
+                          disabled={deletingId !== null}
+                          className="flex items-center text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 cursor-pointer disabled:opacity-50"
+                        >
+                          {deletingId === s.id ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5 mr-1" />
+                          )}
+                          Delete
+                        </button>
                       </div>
                     </div>
                   </div>
