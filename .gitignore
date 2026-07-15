@@ -25,4 +25,4 @@ dist-ssr
 *.data
 *password.txt
 *skill.md
-
+*.env
