@@ -29,6 +29,11 @@ export interface Scholarship {
   created_at: string;
 }
 
+export interface MarksDistributionItem {
+  name: string;
+  max_marks: number;
+}
+
 export interface Subject {
   id: string;
   scholarship_id: string;
@@ -40,6 +45,7 @@ export interface Subject {
   question_type: 'MCQ' | 'Written' | 'Mixed';
   negative_marking: boolean;
   negative_value: number;
+  marks_distribution?: MarksDistributionItem[] | null;
 }
 
 export interface Student {
@@ -81,6 +87,7 @@ export interface Mark {
   student_id: string;
   subject_id: string;
   marks_obtained: number | null;
+  component_marks?: Record<string, number> | null;
   entered_by: string;
   created_at: string;
   updated_at: string;

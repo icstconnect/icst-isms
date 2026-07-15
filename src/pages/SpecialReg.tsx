@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard } from '../services/mockDb';
-import { UserCheck, Printer, Download, QrCode } from 'lucide-react';
+import { UserCheck, Printer, QrCode } from 'lucide-react';
 
 export const SpecialReg: React.FC = () => {
   const schools = mockDb.getData<School>('schools');

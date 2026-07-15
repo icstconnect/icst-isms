@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { mockDb, Student, School, Scholarship } from '../services/mockDb';
-import { UserSquare2, Plus, Mail, Phone, Calendar, Search } from 'lucide-react';
+import { UserSquare2, Plus, Phone, Calendar, Search } from 'lucide-react';
 
 export const Students: React.FC = () => {
   const schools = mockDb.getData<School>('schools');

@@ -1,57 +1,113 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, Subject, Mark, Attendance } from '../services/mockDb';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Database, ShieldAlert, CheckCircle, Save, Lock, Unlock } from 'lucide-react';
+import { Database, ShieldAlert, CheckCircle, Save, Lock, Unlock, Layers } from 'lucide-react';
 
 export const MarksEntry: React.FC = () => {
   const { user } = useAuth();
-  const scholarships = mockDb.getData<Scholarship>('scholarships');
-  const schools = mockDb.getData<School>('schools');
+  
+  // Database states loaded from Supabase or mockDb
+  const [dbScholarships, setDbScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
+  const [dbSchools, setDbSchools] = useState<School[]>(mockDb.getData<School>('schools'));
+  const [dbSubjects, setDbSubjects] = useState<Subject[]>(mockDb.getData<Subject>('subjects'));
+  const [dbStudents, setDbStudents] = useState<Student[]>(mockDb.getData<Student>('students'));
+  const [dbMarks, setDbMarks] = useState<Mark[]>(mockDb.getData<Mark>('marks'));
+  const [dbAttendance, setDbAttendance] = useState<Attendance[]>(mockDb.getData<Attendance>('attendance'));
+  const [dbAdmitCards, setDbAdmitCards] = useState<any[]>(mockDb.getData<any>('admit_cards'));
 
-  const [selectedSch, setSelectedSch] = useState(scholarships[0]?.id || '');
-  const [selectedScl, setSelectedScl] = useState(schools[0]?.id || '');
+  const [selectedSch, setSelectedSch] = useState('');
+  const [selectedScl, setSelectedScl] = useState('');
   const [selectedSub, setSelectedSub] = useState('');
 
-  const [students, setStudents] = useState<Student[]>(mockDb.getData<Student>('students'));
-  const [marks, setMarks] = useState<Mark[]>(mockDb.getData<Mark>('marks'));
-  const [attendance, setAttendance] = useState<Attendance[]>(mockDb.getData<Attendance>('attendance'));
-
   // Admin lock toggles (state holds local locks; SuperAdmin/Admin can toggle them)
-  const [marksEntryEnabled, setMarksEntryEnabled] = useState(true);
+  const [marksEntryEnabled] = useState(true);
   const [marksEditingEnabled, setMarksEditingEnabled] = useState(true);
   
   // Local changes temp buffer
   const [localScores, setLocalScores] = useState<Record<string, number | 'AB'>>({});
+  const [localComponentScores, setLocalComponentScores] = useState<Record<string, Record<string, number>>>({});
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Fetch all databases from Supabase if configured
+  useEffect(() => {
+    const fetchLiveDbData = async () => {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const [
+            { data: schs },
+            { data: scls },
+            { data: subs },
+            { data: stus },
+            { data: mrks },
+            { data: atts },
+            { data: cards }
+          ] = await Promise.all([
+            supabase.from('scholarships').select('*'),
+            supabase.from('schools').select('*'),
+            supabase.from('subjects').select('*').order('display_order', { ascending: true }),
+            supabase.from('students').select('*'),
+            supabase.from('marks').select('*'),
+            supabase.from('attendance').select('*'),
+            supabase.from('admit_cards').select('*')
+          ]);
+
+          if (schs) setDbScholarships(schs);
+          if (scls) setDbSchools(scls);
+          if (subs) setDbSubjects(subs);
+          if (stus) setDbStudents(stus);
+          if (mrks) setDbMarks(mrks);
+          if (atts) setDbAttendance(atts);
+          if (cards) setDbAdmitCards(cards);
+
+          if (schs && schs.length > 0) setSelectedSch(schs[0].id);
+          if (scls && scls.length > 0) setSelectedScl(scls[0].id);
+        } catch (err) {
+          console.error("Error fetching live data for Marks Entry from Supabase:", err);
+        }
+      } else {
+        // Fallback: sync defaults if not configured
+        if (dbScholarships.length > 0) setSelectedSch(dbScholarships[0].id);
+        if (dbSchools.length > 0) setSelectedScl(dbSchools[0].id);
+      }
+    };
+    fetchLiveDbData();
+  }, []);
 
   // Load subjects for selected scholarship
   const subjects = useMemo(() => {
-    const list = mockDb.getData<Subject>('subjects').filter(s => s.scholarship_id === selectedSch);
-    if (list.length > 0 && !selectedSub) {
-      setSelectedSub(list[0].id);
+    return dbSubjects.filter(s => s.scholarship_id === selectedSch);
+  }, [dbSubjects, selectedSch]);
+
+  // Sync selectedSub when subjects list changes
+  useEffect(() => {
+    if (subjects.length > 0) {
+      if (!selectedSub || !subjects.some(s => s.id === selectedSub)) {
+        setSelectedSub(subjects[0].id);
+      }
+    } else {
+      setSelectedSub('');
     }
-    return list;
-  }, [selectedSch]);
+  }, [subjects, selectedSub]);
 
   // Load subject specifications
   const activeSubjectSpec = useMemo(() => {
     return subjects.find(s => s.id === selectedSub) || null;
   }, [subjects, selectedSub]);
 
+  const hasDist = useMemo(() => {
+    return activeSubjectSpec?.marks_distribution && activeSubjectSpec.marks_distribution.length > 0;
+  }, [activeSubjectSpec]);
+
   // Load student lists with their existing marks for this subject
   const studentRows = useMemo(() => {
-    const filteredStudents = students.filter(s => s.scholarship_id === selectedSch && s.school_id === selectedScl);
+    const filteredStudents = dbStudents.filter(s => s.scholarship_id === selectedSch && s.school_id === selectedScl);
     
     return filteredStudents.map(student => {
-      // Find admit card (required for marks entry)
-      const admitCard = mockDb.getData<any>('admit_cards').find((ac: any) => ac.student_id === student.id);
-      
-      // Find current attendance status
-      const attend = attendance.find(a => a.student_id === student.id);
+      const admitCard = dbAdmitCards.find((ac: any) => ac.student_id === student.id);
+      const attend = dbAttendance.find(a => a.student_id === student.id);
       const isAbsent = attend?.status === 'Absent';
-
-      // Find current mark
-      const markEntry = marks.find(m => m.student_id === student.id && m.subject_id === selectedSub);
+      const markEntry = dbMarks.find(m => m.student_id === student.id && m.subject_id === selectedSub);
       
       const scoreValue = isAbsent ? 'AB' : (markEntry ? markEntry.marks_obtained : '');
 
@@ -60,13 +116,37 @@ export const MarksEntry: React.FC = () => {
         admitCard,
         isAbsent,
         scoreValue,
-        markId: markEntry?.id || null
+        markId: markEntry?.id || null,
+        componentMarks: markEntry?.component_marks || null
       };
     });
-  }, [students, marks, attendance, selectedSch, selectedScl, selectedSub]);
+  }, [dbStudents, dbMarks, dbAttendance, dbAdmitCards, selectedSch, selectedScl, selectedSub]);
+
+  const getComponentScore = (studentId: string, componentName: string, savedComponentMarks: any) => {
+    if (localComponentScores[studentId]?.[componentName] !== undefined) {
+      return localComponentScores[studentId][componentName] === null ? '' : localComponentScores[studentId][componentName];
+    }
+    if (savedComponentMarks?.[componentName] !== undefined) {
+      return savedComponentMarks[componentName];
+    }
+    return '';
+  };
+
+  const calculateTotalFromComponents = (scores: Record<string, number>, distribution: any[]): number | null => {
+    let sum = 0;
+    let hasEntries = false;
+    distribution.forEach(item => {
+      const val = scores[item.name];
+      if (val !== undefined && val !== null) {
+        sum += val;
+        hasEntries = true;
+      }
+    });
+    return hasEntries ? sum : null;
+  };
 
   const handleScoreChange = (studentId: string, value: string, isAbsent: boolean) => {
-    if (isAbsent) return; // Prevent entries if absent
+    if (isAbsent) return; 
 
     if (value === '') {
       const copy = { ...localScores };
@@ -79,7 +159,7 @@ export const MarksEntry: React.FC = () => {
     const maxMarks = activeSubjectSpec?.full_marks || 100;
 
     if (isNaN(numericVal) || numericVal < 0 || numericVal > maxMarks) {
-      return; // Invalid score input bound check
+      return; 
     }
 
     setLocalScores({
@@ -88,89 +168,229 @@ export const MarksEntry: React.FC = () => {
     });
   };
 
-  const handleToggleAttendance = (studentId: string, currentStatus: boolean) => {
+  const handleComponentScoreChange = (
+    studentId: string,
+    componentName: string,
+    value: string,
+    maxMarks: number,
+    savedComponentMarks: any
+  ) => {
+    const currentStudentScores = {
+      ...savedComponentMarks,
+      ...(localComponentScores[studentId] || {})
+    };
+
+    if (value === '') {
+      delete currentStudentScores[componentName];
+      const updatedLocal = { ...(localComponentScores[studentId] || {}) };
+      delete updatedLocal[componentName];
+      
+      const newLocalComp = {
+        ...localComponentScores,
+        [studentId]: updatedLocal
+      };
+      setLocalComponentScores(newLocalComp);
+
+      const total = calculateTotalFromComponents(currentStudentScores, activeSubjectSpec?.marks_distribution || []);
+      if (total === null) {
+        const copyTotal = { ...localScores };
+        delete copyTotal[studentId];
+        setLocalScores(copyTotal);
+      } else {
+        setLocalScores({
+          ...localScores,
+          [studentId]: total
+        });
+      }
+      return;
+    }
+
+    const numericVal = parseFloat(value);
+    if (isNaN(numericVal) || numericVal < 0 || numericVal > maxMarks) {
+      return; 
+    }
+
+    const updatedLocal = {
+      ...(localComponentScores[studentId] || {}),
+      [componentName]: numericVal
+    };
+
+    const newLocalComp = {
+      ...localComponentScores,
+      [studentId]: updatedLocal
+    };
+    setLocalComponentScores(newLocalComp);
+
+    const mergedScores = {
+      ...savedComponentMarks,
+      ...updatedLocal
+    };
+
+    const total = calculateTotalFromComponents(mergedScores, activeSubjectSpec?.marks_distribution || []);
+    if (total !== null) {
+      setLocalScores({
+        ...localScores,
+        [studentId]: total
+      });
+    }
+  };
+
+  const handleToggleAttendance = async (studentId: string, currentStatus: boolean) => {
     const newStatus = currentStatus ? 'Present' : 'Absent';
     
-    // 1. Update mock DB record
-    const existing = attendance.find(a => a.student_id === studentId);
-    let updatedAttendance = [...attendance];
+    const existing = dbAttendance.find(a => a.student_id === studentId);
+    let updatedAttendance = [...dbAttendance];
     
+    const attData = {
+      student_id: studentId,
+      status: newStatus,
+      recorded_by: user?.id || 'usr-1'
+    };
+
+    let insertedId = `att-${Date.now()}`;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        if (existing) {
+          const { error } = await supabase
+            .from('attendance')
+            .update({ status: newStatus })
+            .eq('id', existing.id);
+          if (error) throw error;
+        } else {
+          const { data, error } = await supabase
+            .from('attendance')
+            .insert(attData)
+            .select()
+            .single();
+          if (error) throw error;
+          if (data) insertedId = data.id;
+        }
+      } catch (err: any) {
+        alert("Failed to save attendance in Supabase: " + err.message);
+        return;
+      }
+    }
+
     if (existing) {
       const updated = mockDb.updateRecord<Attendance>('attendance', existing.id, { status: newStatus });
       if (updated) {
-        updatedAttendance = attendance.map(a => a.id === existing.id ? updated : a);
+        updatedAttendance = dbAttendance.map(a => a.id === existing.id ? updated : a);
       }
     } else {
       const created = mockDb.addRecord<Attendance>('attendance', {
-        student_id: studentId,
-        status: newStatus,
-        recorded_by: user?.id || 'usr-1'
+        id: insertedId,
+        ...attData
       });
       updatedAttendance.push(created);
     }
 
-    setAttendance(updatedAttendance);
+    setDbAttendance(updatedAttendance);
 
     // If marked absent, reset local scores
     if (newStatus === 'Absent') {
       const copy = { ...localScores };
       delete copy[studentId];
       setLocalScores(copy);
+
+      const copyComp = { ...localComponentScores };
+      delete copyComp[studentId];
+      setLocalComponentScores(copyComp);
       
-      // Update marks table to null/absent if there was a record
-      const markEntry = marks.find(m => m.student_id === studentId && m.subject_id === selectedSub);
+      const markEntry = dbMarks.find(m => m.student_id === studentId && m.subject_id === selectedSub);
       if (markEntry) {
-        const updatedMark = mockDb.updateRecord<Mark>('marks', markEntry.id, { marks_obtained: null });
+        if (isSupabaseConfigured && supabase) {
+          try {
+            const { error } = await supabase
+              .from('marks')
+              .update({ marks_obtained: null, component_marks: null })
+              .eq('id', markEntry.id);
+            if (error) throw error;
+          } catch (err: any) {
+            alert("Failed to reset marks in Supabase: " + err.message);
+            return;
+          }
+        }
+
+        const updatedMark = mockDb.updateRecord<Mark>('marks', markEntry.id, { marks_obtained: null, component_marks: undefined });
         if (updatedMark) {
-          setMarks(marks.map(m => m.id === markEntry.id ? updatedMark : m));
+          setDbMarks(dbMarks.map(m => m.id === markEntry.id ? updatedMark : m));
         }
       }
     }
   };
 
-  const handleSave = () => {
-    let updatedMarks = [...marks];
+  const handleSave = async () => {
+    let updatedMarks = [...dbMarks];
 
-    Object.keys(localScores).forEach(studentId => {
+    const savePromises = Object.keys(localScores).map(async studentId => {
       const score = localScores[studentId];
       if (score === 'AB') return;
 
-      const existingMark = marks.find(m => m.student_id === studentId && m.subject_id === selectedSub);
+      const existingMark = dbMarks.find(m => m.student_id === studentId && m.subject_id === selectedSub);
       
+      const compScores = hasDist
+        ? {
+            ...(existingMark?.component_marks || {}),
+            ...(localComponentScores[studentId] || {})
+          }
+        : null;
+
+      const markData = {
+        student_id: studentId,
+        subject_id: selectedSub,
+        marks_obtained: score,
+        component_marks: compScores,
+        entered_by: user?.id || 'usr-1'
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          if (existingMark) {
+            const { error } = await supabase
+              .from('marks')
+              .update(markData)
+              .eq('id', existingMark.id);
+            if (error) throw error;
+          } else {
+            const { error } = await supabase
+              .from('marks')
+              .insert(markData);
+            if (error) throw error;
+          }
+        } catch (err: any) {
+          alert(`Failed to save mark for candidate: ${err.message}`);
+          throw err;
+        }
+      }
+
       if (existingMark) {
-        // Update
-        const updated = mockDb.updateRecord<Mark>('marks', existingMark.id, {
-          marks_obtained: score,
-          entered_by: user?.id || 'usr-1'
-        });
+        const updated = mockDb.updateRecord<Mark>('marks', existingMark.id, markData);
         if (updated) {
           updatedMarks = updatedMarks.map(m => m.id === existingMark.id ? updated : m);
         }
       } else {
-        // Insert new
-        const created = mockDb.addRecord<Mark>('marks', {
-          student_id: studentId,
-          subject_id: selectedSub,
-          marks_obtained: score,
-          entered_by: user?.id || 'usr-1'
-        });
+        const created = mockDb.addRecord<Mark>('marks', markData);
         updatedMarks.push(created);
       }
     });
 
-    setMarks(updatedMarks);
-    setLocalScores({});
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    try {
+      await Promise.all(savePromises);
+      setDbMarks(updatedMarks);
+      setLocalScores({});
+      setLocalComponentScores({});
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (e) {
+      console.error("Save transaction error:", e);
+    }
   };
 
-  // Check if current user role is authorized to perform editing/saving
   const isAuthorizedToEdit = useMemo(() => {
     if (!user) return false;
     const isSuperAdminOrAdmin = user.role === 'SuperAdmin' || user.role === 'Admin';
-    if (isSuperAdminOrAdmin) return true; // Admins override locks
+    if (isSuperAdminOrAdmin) return true; 
     
-    // Check coordinator role authorization alongside active admin locks
     const isCoordinator = user.role === 'ScholarshipCoordinator';
     return isCoordinator && marksEditingEnabled && marksEntryEnabled;
   }, [user, marksEntryEnabled, marksEditingEnabled]);
@@ -230,7 +450,7 @@ export const MarksEntry: React.FC = () => {
       {saveSuccess && (
         <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-2xl flex items-center space-x-2 text-sm font-medium">
           <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-          <span>Scores and Attendance logs saved successfully. Postgres Audit triggers completed.</span>
+          <span>Scores and Attendance logs saved successfully. PostgreSQL sync completed.</span>
         </div>
       )}
 
@@ -240,10 +460,10 @@ export const MarksEntry: React.FC = () => {
           <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Scholarship Session</label>
           <select
             value={selectedSch}
-            onChange={(e) => { setSelectedSch(e.target.value); setLocalScores({}); }}
+            onChange={(e) => { setSelectedSch(e.target.value); setLocalScores({}); setLocalComponentScores({}); }}
             className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none"
           >
-            {scholarships.map(s => (
+            {dbScholarships.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
@@ -253,10 +473,10 @@ export const MarksEntry: React.FC = () => {
           <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Academic School</label>
           <select
             value={selectedScl}
-            onChange={(e) => { setSelectedScl(e.target.value); setLocalScores({}); }}
+            onChange={(e) => { setSelectedScl(e.target.value); setLocalScores({}); setLocalComponentScores({}); }}
             className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none"
           >
-            {schools.map(s => (
+            {dbSchools.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
@@ -266,7 +486,7 @@ export const MarksEntry: React.FC = () => {
           <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Subject Selection</label>
           <select
             value={selectedSub}
-            onChange={(e) => { setSelectedSub(e.target.value); setLocalScores({}); }}
+            onChange={(e) => { setSelectedSub(e.target.value); setLocalScores({}); setLocalComponentScores({}); }}
             className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none"
           >
             {subjects.map(s => (
@@ -284,7 +504,7 @@ export const MarksEntry: React.FC = () => {
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="p-4 font-semibold text-slate-600">Candidate Name</th>
                 <th className="p-4 font-semibold text-slate-600 text-center">Exam Roll</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Attendance status</th>
+                <th className="p-4 font-semibold text-slate-600 text-center">Attendance Status</th>
                 <th className="p-4 font-semibold text-slate-600 text-center">Marks Obtained</th>
                 <th className="p-4 font-semibold text-slate-600 text-center">Status</th>
               </tr>
@@ -323,14 +543,42 @@ export const MarksEntry: React.FC = () => {
                       </button>
                     </td>
                     <td className="p-4 text-center">
-                      <input
-                        type="number"
-                        disabled={row.isAbsent || !isAuthorizedToEdit || !row.admitCard}
-                        placeholder={row.isAbsent ? 'AB' : 'Score'}
-                        value={currentScore === 'AB' || currentScore === null ? '' : currentScore}
-                        onChange={(e) => handleScoreChange(row.student.id, e.target.value, row.isAbsent)}
-                        className="w-24 text-center border border-slate-200 px-2 py-1 text-sm rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-extrabold text-slate-800 disabled:opacity-50"
-                      />
+                      {hasDist && activeSubjectSpec?.marks_distribution ? (
+                        <div className="flex flex-col items-center space-y-2">
+                          <div className="flex items-center justify-center space-x-3">
+                            {activeSubjectSpec.marks_distribution.map((comp) => {
+                              const compVal = getComponentScore(row.student.id, comp.name, row.componentMarks);
+                              return (
+                                <div key={comp.name} className="flex flex-col items-center">
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase">{comp.name} (/{comp.max_marks})</span>
+                                  <input
+                                    type="number"
+                                    disabled={row.isAbsent || !isAuthorizedToEdit || !row.admitCard}
+                                    placeholder="Score"
+                                    value={compVal}
+                                    onChange={(e) => handleComponentScoreChange(row.student.id, comp.name, e.target.value, comp.max_marks, row.componentMarks)}
+                                    className="w-16 text-center border border-slate-200 px-1 py-1 text-xs rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800 disabled:opacity-50 mt-1"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {currentScore !== '' && currentScore !== null && (
+                            <div className="text-xs font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                              Total: {currentScore} / {activeSubjectSpec.full_marks}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <input
+                          type="number"
+                          disabled={row.isAbsent || !isAuthorizedToEdit || !row.admitCard}
+                          placeholder={row.isAbsent ? 'AB' : 'Score'}
+                          value={currentScore === 'AB' || currentScore === null ? '' : currentScore}
+                          onChange={(e) => handleScoreChange(row.student.id, e.target.value, row.isAbsent)}
+                          className="w-24 text-center border border-slate-200 px-2 py-1 text-sm rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-extrabold text-slate-800 disabled:opacity-50"
+                        />
+                      )}
                     </td>
                     <td className="p-4 text-center">
                       {row.isAbsent ? (

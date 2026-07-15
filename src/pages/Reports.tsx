@@ -1,36 +1,80 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard, Mark, Attendance } from '../services/mockDb';
-import { FileSpreadsheet, Download, Search, AlertCircle, FileText } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { FileSpreadsheet, Download, AlertCircle, FileText } from 'lucide-react';
 
 export const Reports: React.FC = () => {
-  const scholarships = mockDb.getData<Scholarship>('scholarships');
-  const schools = mockDb.getData<School>('schools');
+  const [dbScholarships, setDbScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
+  const [dbSchools, setDbSchools] = useState<School[]>(mockDb.getData<School>('schools'));
+  const [dbSubjects, setDbSubjects] = useState<any[]>(mockDb.getData<any>('subjects'));
+  const [dbStudents, setDbStudents] = useState<Student[]>(mockDb.getData<Student>('students'));
+  const [dbAdmitCards, setDbAdmitCards] = useState<AdmitCard[]>(mockDb.getData<AdmitCard>('admit_cards'));
+  const [dbMarks, setDbMarks] = useState<Mark[]>(mockDb.getData<Mark>('marks'));
+  const [dbAttendance, setDbAttendance] = useState<Attendance[]>(mockDb.getData<Attendance>('attendance'));
 
-  const [selectedSch, setSelectedSch] = useState(scholarships[0]?.id || '');
+  const [selectedSch, setSelectedSch] = useState('');
   const [reportType, setReportType] = useState<'MeritList' | 'AbsentList'>('MeritList');
 
-  const students = mockDb.getData<Student>('students');
-  const admitCards = mockDb.getData<AdmitCard>('admit_cards');
-  const marks = mockDb.getData<Mark>('marks');
-  const attendance = mockDb.getData<Attendance>('attendance');
+  // Fetch all databases from Supabase if configured
+  useEffect(() => {
+    const fetchLiveDbData = async () => {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const [
+            { data: schs },
+            { data: scls },
+            { data: subs },
+            { data: stus },
+            { data: mrks },
+            { data: atts },
+            { data: cards }
+          ] = await Promise.all([
+            supabase.from('scholarships').select('*'),
+            supabase.from('schools').select('*'),
+            supabase.from('subjects').select('*').order('display_order', { ascending: true }),
+            supabase.from('students').select('*'),
+            supabase.from('marks').select('*'),
+            supabase.from('attendance').select('*'),
+            supabase.from('admit_cards').select('*')
+          ]);
+
+          if (schs) {
+            setDbScholarships(schs);
+            if (schs.length > 0) setSelectedSch(schs[0].id);
+          }
+          if (scls) setDbSchools(scls);
+          if (subs) setDbSubjects(subs);
+          if (stus) setDbStudents(stus);
+          if (mrks) setDbMarks(mrks);
+          if (atts) setDbAttendance(atts);
+          if (cards) setDbAdmitCards(cards);
+        } catch (err) {
+          console.error("Error fetching live data for Reports from Supabase:", err);
+        }
+      } else {
+        if (dbScholarships.length > 0) setSelectedSch(dbScholarships[0].id);
+      }
+    };
+    fetchLiveDbData();
+  }, []);
 
   // Load subject checklist for the active scholarship
   const subjects = useMemo(() => {
-    return mockDb.getData<any>('subjects').filter(sub => sub.scholarship_id === selectedSch);
-  }, [selectedSch]);
+    return dbSubjects.filter(sub => sub.scholarship_id === selectedSch);
+  }, [dbSubjects, selectedSch]);
 
   // Ranks/Filters rows depending on selection
   const reportRows = useMemo(() => {
-    const activeSchStudents = students.filter(s => s.scholarship_id === selectedSch);
+    const activeSchStudents = dbStudents.filter(s => s.scholarship_id === selectedSch);
 
     if (reportType === 'AbsentList') {
       // Find students marked as Absent
       return activeSchStudents.filter(student => {
-        const attend = attendance.find(a => a.student_id === student.id);
+        const attend = dbAttendance.find(a => a.student_id === student.id);
         return attend?.status === 'Absent';
       }).map(student => {
-        const school = schools.find(s => s.id === student.school_id);
-        const card = admitCards.find(ac => ac.student_id === student.id);
+        const school = dbSchools.find(s => s.id === student.school_id);
+        const card = dbAdmitCards.find(ac => ac.student_id === student.id);
         return {
           id: student.id,
           studentId: student.student_id,
@@ -44,12 +88,12 @@ export const Reports: React.FC = () => {
       // Merit List
       // Ranks present students by their score total
       const presentRows = activeSchStudents.filter(student => {
-        const attend = attendance.find(a => a.student_id === student.id);
+        const attend = dbAttendance.find(a => a.student_id === student.id);
         return !attend || attend.status === 'Present';
       }).map(student => {
-        const school = schools.find(s => s.id === student.school_id);
-        const card = admitCards.find(ac => ac.student_id === student.id);
-        const studentMarks = marks.filter(m => m.student_id === student.id);
+        const school = dbSchools.find(s => s.id === student.school_id);
+        const card = dbAdmitCards.find(ac => ac.student_id === student.id);
+        const studentMarks = dbMarks.filter(m => m.student_id === student.id);
 
         let total = 0;
         let subjectsAttempted = 0;
@@ -79,7 +123,7 @@ export const Reports: React.FC = () => {
       // Sort by total marks descending
       return presentRows.sort((a, b) => b.total - a.total);
     }
-  }, [selectedSch, reportType, students, admitCards, marks, attendance, subjects, schools]);
+  }, [selectedSch, reportType, dbStudents, dbAdmitCards, dbMarks, dbAttendance, subjects, dbSchools]);
 
   // Export CSV Helper
   const handleExportCSV = () => {
@@ -153,7 +197,7 @@ export const Reports: React.FC = () => {
             onChange={(e) => setSelectedSch(e.target.value)}
             className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none"
           >
-            {scholarships.map(s => (
+            {dbScholarships.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>

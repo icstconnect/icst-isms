@@ -76,6 +76,7 @@ CREATE TABLE subjects (
   question_type VARCHAR NOT NULL DEFAULT 'MCQ' CHECK (question_type IN ('MCQ', 'Written', 'Mixed')),
   negative_marking BOOLEAN NOT NULL DEFAULT FALSE,
   negative_value NUMERIC(4, 2) DEFAULT 0.00,
+  marks_distribution JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -139,6 +140,7 @@ CREATE TABLE marks (
   student_id UUID REFERENCES students(id) ON DELETE CASCADE NOT NULL,
   subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE NOT NULL,
   marks_obtained NUMERIC(5, 2) CHECK (marks_obtained >= 0),
+  component_marks JSONB,
   entered_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,

@@ -17,8 +17,7 @@ import {
   UserCheck, 
   BookOpen, 
   FileSpreadsheet, 
-  Users, 
-  RefreshCw 
+  Users
 } from 'lucide-react';
 
 interface SidebarItem {

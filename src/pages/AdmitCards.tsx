@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard } from '../services/mockDb';
-import { FileText, Printer, Search, QrCode } from 'lucide-react';
+import { FileText, Printer, QrCode } from 'lucide-react';
 
 export const AdmitCards: React.FC = () => {
   const scholarships = mockDb.getData<Scholarship>('scholarships');
@@ -9,7 +9,7 @@ export const AdmitCards: React.FC = () => {
   const [selectedSch, setSelectedSch] = useState(scholarships[0]?.id || '');
   const [selectedScl, setSelectedScl] = useState('');
   
-  const [students, setStudents] = useState<Student[]>(mockDb.getData<Student>('students'));
+  const [students] = useState<Student[]>(mockDb.getData<Student>('students'));
   const [admitCards, setAdmitCards] = useState<AdmitCard[]>(mockDb.getData<AdmitCard>('admit_cards'));
 
   // Filter students who don't have admit cards generated yet
@@ -25,7 +25,7 @@ export const AdmitCards: React.FC = () => {
         school: schools.find(sch => sch.id === s.school_id)
       };
     });
-  }, [students, admitCards, selectedSch, selectedScl]);
+  }, [students, admitCards, schools, selectedSch, selectedScl]);
 
   const handleGenerateAll = () => {
     // Generate admit cards for all students in the filtered selection who don't have cards yet
@@ -38,7 +38,7 @@ export const AdmitCards: React.FC = () => {
     const currentYear = scholarships.find(s => s.id === selectedSch)?.academic_year || 2026;
     const generated: AdmitCard[] = [];
 
-    pendingList.forEach((item, index) => {
+    pendingList.forEach((item) => {
       // 8 Digit Roll Number: YY + District code (e.g. 1) + sequence
       const rollSeq = String(admitCards.length + generated.length + 1).padStart(5, '0');
       const generatedRoll = `${String(currentYear).substring(2, 4)}1${rollSeq.substring(2)}`;

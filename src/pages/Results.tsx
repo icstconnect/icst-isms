@@ -1,21 +1,48 @@
-import React, { useState, useMemo } from 'react';
-import { mockDb, Scholarship, School, Student, AdmitCard, Mark } from '../services/mockDb';
+import React, { useState, useEffect } from 'react';
+import { mockDb, Scholarship, School, Student, AdmitCard, Mark, Subject, Attendance } from '../services/mockDb';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { Search, Printer, Download, Award, School2, BookOpen } from 'lucide-react';
 
 export const Results: React.FC = () => {
-  const scholarships = mockDb.getData<Scholarship>('scholarships').filter(s => s.status === 'ResultsPublished' || s.status === 'Completed' || s.status === 'MarksEntry'); // Allowed for demo
-  const schools = mockDb.getData<School>('schools');
+  const [scholarships, setScholarships] = useState<Scholarship[]>(
+    mockDb.getData<Scholarship>('scholarships').filter(s => s.status === 'ResultsPublished' || s.status === 'Completed' || s.status === 'MarksEntry')
+  );
+  const [schools, setSchools] = useState<School[]>(mockDb.getData<School>('schools'));
   
-  const [selectedScholarship, setSelectedScholarship] = useState(scholarships[0]?.id || '');
+  const [selectedScholarship, setSelectedScholarship] = useState('');
   const [selectedSchool, setSelectedSchool] = useState('');
   const [rollNumber, setRollNumber] = useState('');
-  const [searchTriggered, setSearchTriggered] = useState(false);
   const [studentResult, setStudentResult] = useState<any | null>(null);
   const [error, setError] = useState('');
 
-  const handleSearch = (e: React.FormEvent) => {
+  // Fetch initial filters from Supabase if configured
+  useEffect(() => {
+    const fetchFilters = async () => {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: schs } = await supabase
+            .from('scholarships')
+            .select('*')
+            .in('status', ['ResultsPublished', 'Completed', 'MarksEntry']);
+          const { data: scls } = await supabase.from('schools').select('*');
+
+          if (schs) {
+            setScholarships(schs);
+            if (schs.length > 0) setSelectedScholarship(schs[0].id);
+          }
+          if (scls) setSchools(scls);
+        } catch (err) {
+          console.error("Error loading filters from Supabase:", err);
+        }
+      } else {
+        if (scholarships.length > 0) setSelectedScholarship(scholarships[0].id);
+      }
+    };
+    fetchFilters();
+  }, []);
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSearchTriggered(true);
     setError('');
     setStudentResult(null);
 
@@ -24,43 +51,116 @@ export const Results: React.FC = () => {
       return;
     }
 
-    // 1. Find Admit Card with matching roll number
-    const admitCards = mockDb.getData<AdmitCard>('admit_cards');
-    const admitCard = admitCards.find(ac => ac.roll_number === rollNumber.trim());
+    let admitCard: AdmitCard | null = null;
+    let student: Student | null = null;
+    let studentMarks: Mark[] = [];
+    let subjects: Subject[] = [];
+    let attendanceList: Attendance[] = [];
+    let schoolDetails: School | null = null;
 
-    if (!admitCard) {
-      setError('No admit card found for the provided Roll Number.');
-      return;
-    }
+    if (isSupabaseConfigured && supabase) {
+      try {
+        // Query Admit Card
+        const { data: cardData, error: cardErr } = await supabase
+          .from('admit_cards')
+          .select('*')
+          .eq('roll_number', rollNumber.trim())
+          .maybeSingle();
 
-    // 2. Find Student details
-    const students = mockDb.getData<Student>('students');
-    const student = students.find(s => s.id === admitCard.student_id);
+        if (cardErr) throw cardErr;
+        if (!cardData) {
+          setError('No admit card found for the provided Roll Number.');
+          return;
+        }
+        admitCard = cardData;
 
-    if (!student) {
-      setError('Student record not found.');
-      return;
+        // Query Student
+        const { data: stuData, error: stuErr } = await supabase
+          .from('students')
+          .select('*')
+          .eq('id', admitCard!.student_id)
+          .maybeSingle();
+
+        if (stuErr) throw stuErr;
+        if (!stuData) {
+          setError('Student record not found.');
+          return;
+        }
+        student = stuData;
+
+        // Query School
+        const { data: sclData } = await supabase
+          .from('schools')
+          .select('*')
+          .eq('id', student!.school_id)
+          .maybeSingle();
+        schoolDetails = sclData;
+
+        // Query Marks
+        const { data: marksData } = await supabase
+          .from('marks')
+          .select('*')
+          .eq('student_id', student!.id);
+        studentMarks = marksData || [];
+
+        // Query Subjects
+        const { data: subsData } = await supabase
+          .from('subjects')
+          .select('*')
+          .eq('scholarship_id', student!.scholarship_id)
+          .order('display_order', { ascending: true });
+        subjects = subsData || [];
+
+        // Query Attendance
+        const { data: attData } = await supabase
+          .from('attendance')
+          .select('*')
+          .eq('student_id', student!.id);
+        attendanceList = attData || [];
+
+      } catch (err: any) {
+        setError('Error fetching results from database: ' + err.message);
+        return;
+      }
+    } else {
+      // Fallback local query
+      const admitCards = mockDb.getData<AdmitCard>('admit_cards');
+      const cardData = admitCards.find(ac => ac.roll_number === rollNumber.trim());
+
+      if (!cardData) {
+        setError('No admit card found for the provided Roll Number.');
+        return;
+      }
+      admitCard = cardData;
+
+      const students = mockDb.getData<Student>('students');
+      const stuData = students.find(s => s.id === admitCard!.student_id);
+
+      if (!stuData) {
+        setError('Student record not found.');
+        return;
+      }
+      student = stuData;
+
+      schoolDetails = schools.find(s => s.id === student!.school_id) || null;
+      const marksList = mockDb.getData<Mark>('marks');
+      studentMarks = marksList.filter(m => m.student_id === student!.id);
+      subjects = mockDb.getData<any>('subjects').filter((sub: any) => sub.scholarship_id === student!.scholarship_id);
+      attendanceList = mockDb.getData<any>('attendance').filter((a: any) => a.student_id === student!.id);
     }
 
     // Verify school and scholarship filter constraints
-    if (selectedSchool && student.school_id !== selectedSchool) {
+    if (selectedSchool && student!.school_id !== selectedSchool) {
       setError('Roll Number does not match the selected school.');
       return;
     }
-    if (selectedScholarship && student.scholarship_id !== selectedScholarship) {
+    if (selectedScholarship && student!.scholarship_id !== selectedScholarship) {
       setError('Roll Number does not match the selected scholarship session.');
       return;
     }
 
-    // 3. Find Marks
-    const marksList = mockDb.getData<Mark>('marks');
-    const studentMarks = marksList.filter(m => m.student_id === student.id);
-
-    const subjects = mockDb.getData<any>('subjects').filter(sub => sub.scholarship_id === student.scholarship_id);
-    
-    // Check attendance
-    const attendance = mockDb.getData<any>('attendance').find(a => a.student_id === student.id);
-    const isAbsent = attendance?.status === 'Absent';
+    const attend = attendanceList.find(a => a.student_id === student!.id);
+    const isAbsent = attend?.status === 'Absent';
 
     // Calculate marks
     let totalMarksObtained = 0;
@@ -78,11 +178,12 @@ export const Results: React.FC = () => {
         subjectName: sub.name,
         fullMarks: sub.full_marks,
         passMarks: sub.pass_marks,
-        obtained: score
+        obtained: score,
+        componentMarks: markEntry?.component_marks || null,
+        marksDistribution: sub.marks_distribution || null
       };
     });
 
-    const schoolDetails = schools.find(s => s.id === student.school_id);
     const percentage = totalFullMarks > 0 ? ((totalMarksObtained / totalFullMarks) * 100).toFixed(2) : '0.00';
 
     // Simple Grade Calculation
@@ -216,7 +317,7 @@ export const Results: React.FC = () => {
                 Print Result
               </button>
               <button
-                onClick={handlePrint} // Same printing window trigger
+                onClick={handlePrint}
                 className="flex items-center text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg shadow-sm cursor-pointer transition-colors"
               >
                 <Download className="w-4 h-4 mr-1.5" />
@@ -296,9 +397,23 @@ export const Results: React.FC = () => {
                     const isPass = row.obtained !== 'AB' && row.obtained !== null && row.obtained >= row.passMarks;
                     return (
                       <tr key={row.subjectName} className="hover:bg-slate-50/50">
-                        <td className="p-3 font-medium text-slate-800 flex items-center">
-                          <BookOpen className="w-4 h-4 mr-2 text-slate-400" />
-                          {row.subjectName}
+                        <td className="p-3">
+                          <div className="font-medium text-slate-800 flex items-center">
+                            <BookOpen className="w-4 h-4 mr-2 text-slate-400" />
+                            {row.subjectName}
+                          </div>
+                          {row.marksDistribution && row.marksDistribution.length > 0 && row.obtained !== 'AB' && row.obtained !== null && (
+                            <div className="text-[10px] text-slate-400 mt-1 pl-6 flex flex-wrap gap-1.5">
+                              {row.marksDistribution.map((dist: any) => {
+                                const scored = row.componentMarks?.[dist.name] ?? '-';
+                                return (
+                                  <span key={dist.name} className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/50">
+                                    {dist.name}: <strong className="text-slate-700">{scored}/{dist.max_marks}</strong>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3 text-center text-slate-600 font-semibold">{row.fullMarks}</td>
                         <td className="p-3 text-center text-slate-600">{row.passMarks}</td>

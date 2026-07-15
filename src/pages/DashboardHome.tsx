@@ -7,7 +7,6 @@ import {
   Database, 
   ClipboardList, 
   Clock, 
-  ArrowRight,
   TrendingUp
 } from 'lucide-react';
 import { 
@@ -70,7 +69,7 @@ export const DashboardHome: React.FC = () => {
     });
 
     return pendingCount;
-  }, [students, scholarships, admitCards, marks, attendance, activeScholarship]);
+  }, [students, admitCards, marks, attendance, activeScholarship]);
 
   // Aggregate Chart Data: Registered Students by District
   const chartData = useMemo(() => {

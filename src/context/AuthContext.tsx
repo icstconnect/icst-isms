@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { mockDb, Profile } from '../services/mockDb';
+import { Profile } from '../services/mockDb';
 
 interface AuthContextType {
   user: Profile | null;
@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Supabase Auth Listeners (handled if configured)
       const fetchProfile = async (sessionUser: any) => {
         try {
-          const { data, error } = await supabase
+          const { data } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', sessionUser.id)
