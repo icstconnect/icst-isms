@@ -14,6 +14,46 @@ export const AdmitCards: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Scheduling states
+  const [examDateInput, setExamDateInput] = useState('2026-06-21');
+  const [examStartTime, setExamStartTime] = useState('11:00');
+  const [examEndTime, setExamEndTime] = useState('13:00');
+
+  const formatTime12h = (time24: string): string => {
+    if (!time24) return '';
+    const parts = time24.split(':');
+    let hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+    return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`;
+  };
+
+  const calculatedReportingTime = useMemo(() => {
+    if (!examStartTime) return '';
+    try {
+      const parts = examStartTime.split(':');
+      let hours = parseInt(parts[0], 10) || 0;
+      let minutes = parseInt(parts[1], 10) || 0;
+      
+      let totalMinutes = hours * 60 + minutes - 15;
+      if (totalMinutes < 0) {
+        totalMinutes += 24 * 60; // Wrap around day
+      }
+      
+      const newHours = Math.floor(totalMinutes / 60);
+      const newMinutes = totalMinutes % 60;
+      
+      const displayHours = newHours % 12 === 0 ? 12 : newHours % 12;
+      const displayMinutes = String(newMinutes).padStart(2, '0');
+      const ampm = newHours >= 12 ? 'PM' : 'AM';
+      
+      return `${String(displayHours).padStart(2, '0')}:${displayMinutes} ${ampm}`;
+    } catch (e) {
+      return '';
+    }
+  }, [examStartTime]);
+
   // Fetch live admit card page details from Supabase on mount
   useEffect(() => {
     const fetchLiveDetails = async () => {
@@ -52,11 +92,11 @@ export const AdmitCards: React.FC = () => {
     fetchLiveDetails();
   }, []);
 
-  // Filter students who don't have admit cards generated yet
+  // Filter students who don't have admit cards generated yet (strictly for the selected school)
   const studentsWithCardStatus = useMemo(() => {
+    if (!selectedScl) return [];
     return students.filter(
-      s => s.scholarship_id === selectedSch && 
-           (selectedScl === '' || s.school_id === selectedScl)
+      s => s.scholarship_id === selectedSch && s.school_id === selectedScl
     ).map(s => {
       const card = admitCards.find(ac => ac.student_id === s.id);
       return {
@@ -68,10 +108,17 @@ export const AdmitCards: React.FC = () => {
   }, [students, admitCards, dbSchools, selectedSch, selectedScl]);
 
   const handleGenerateAll = async () => {
-    // Generate admit cards for all students in the filtered selection who don't have cards yet
-    const pendingList = studentsWithCardStatus.filter(item => !item.card);
-    if (pendingList.length === 0) {
-      alert("All students in this selection already have admit cards generated.");
+    if (!selectedScl) {
+      alert("Please select a specific school to generate/update admit cards.");
+      return;
+    }
+    if (!examDateInput || !examStartTime || !examEndTime) {
+      alert("Please configure the examination Date, Start Time, and End Time first.");
+      return;
+    }
+
+    if (studentsWithCardStatus.length === 0) {
+      alert("No students are enrolled in this school for the selected session.");
       return;
     }
 
@@ -79,21 +126,32 @@ export const AdmitCards: React.FC = () => {
     try {
       const currentYear = dbScholarships.find(s => s.id === selectedSch)?.academic_year || 2026;
       const generated: AdmitCard[] = [];
+      const formattedExamTime = `${formatTime12h(examStartTime)} - ${formatTime12h(examEndTime)}`;
 
-      const insertData = pendingList.map((item, index) => {
-        // YY + District Code (1) + Roll sequence number
-        const rollSeq = String(admitCards.length + index + 1).padStart(5, '0');
-        const generatedRoll = `${String(currentYear).substring(2, 4)}1${rollSeq.substring(2)}`;
+      let newCardsCount = 0;
+      const upsertData = studentsWithCardStatus.map((item) => {
+        const hasCard = !!item.card;
+        
+        let rollNumber = '';
+        if (hasCard) {
+          rollNumber = item.card!.roll_number;
+        } else {
+          // Generate new roll number
+          const rollSeq = String(admitCards.length + newCardsCount + 1).padStart(5, '0');
+          rollNumber = `${String(currentYear).substring(2, 4)}1${rollSeq.substring(2)}`;
+          newCardsCount++;
+        }
 
         return {
+          ...(hasCard ? { id: item.card!.id } : {}), // Preserve UUID key if it already exists
           student_id: item.student.id,
-          roll_number: generatedRoll,
-          exam_date: '2026-06-21',
-          reporting_time: '10:00 AM',
-          exam_time: '11:00 AM - 01:00 PM',
+          roll_number: rollNumber,
+          exam_date: examDateInput,
+          reporting_time: calculatedReportingTime,
+          exam_time: formattedExamTime,
           venue: item.school ? `${item.school.name} Hall, ${item.school.district}` : 'Main Examination Center',
           instructions: '1. Bring this Admit Card & School ID card.\n2. Use Black/Blue ballpoint pen only.\n3. Calculator, smartwatches, or mobile phones are strictly prohibited.',
-          qr_code_payload: `https://isms.icstconnect.in/verify/${generatedRoll}`,
+          qr_code_payload: `https://isms.icstconnect.in/verify/${rollNumber}`,
           signature_url: ''
         };
       });
@@ -101,29 +159,50 @@ export const AdmitCards: React.FC = () => {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
           .from('admit_cards')
-          .insert(insertData)
+          .upsert(upsertData, { onConflict: 'student_id' })
           .select();
         if (error) throw error;
         if (data) {
           data.forEach((card: any) => {
-            mockDb.addRecord<AdmitCard>('admit_cards', card);
-            generated.push(card);
+            const exists = mockDb.getData<AdmitCard>('admit_cards').some(ac => ac.id === card.id);
+            if (exists) {
+              mockDb.updateRecord<AdmitCard>('admit_cards', card.id, card);
+            } else {
+              mockDb.addRecord<AdmitCard>('admit_cards', card);
+            }
           });
+
+          // Reload all cards from Supabase to sync client state perfectly
+          const { data: reloadRes, error: reloadErr } = await supabase.from('admit_cards').select('*');
+          if (!reloadErr && reloadRes) {
+            setAdmitCards(reloadRes);
+          }
         }
       } else {
-        insertData.forEach(cardData => {
-          const card = mockDb.addRecord<AdmitCard>('admit_cards', {
-            id: `ac-${Date.now()}-${Math.random()}`,
-            ...cardData
-          });
-          generated.push(card);
+        // Offline mock DB state updates
+        upsertData.forEach(cardData => {
+          const existingRecord = admitCards.find(ac => ac.student_id === cardData.student_id);
+          if (existingRecord) {
+            const updated = mockDb.updateRecord<AdmitCard>('admit_cards', existingRecord.id, cardData);
+            if (updated) generated.push(updated);
+          } else {
+            const inserted = mockDb.addRecord<AdmitCard>('admit_cards', {
+              id: `ac-${Date.now()}-${Math.random()}`,
+              ...cardData
+            });
+            generated.push(inserted);
+          }
         });
+
+        const remainingCards = admitCards.filter(
+          ac => !studentsWithCardStatus.some(item => item.student.id === ac.student_id)
+        );
+        setAdmitCards([...remainingCards, ...generated]);
       }
 
-      setAdmitCards([...admitCards, ...generated]);
-      alert(`Successfully generated ${generated.length} admit cards.`);
+      alert("Admit cards generated / updated successfully.");
     } catch (err: any) {
-      alert("Failed to generate admit cards: " + err.message);
+      alert("Failed to generate/update admit cards: " + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -146,7 +225,7 @@ export const AdmitCards: React.FC = () => {
         <div className="flex space-x-3">
           <button
             onClick={handleGenerateAll}
-            disabled={isSaving || isLoading}
+            disabled={isSaving || isLoading || !selectedScl || !examDateInput || !examStartTime || !examEndTime}
             className="flex items-center text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-50 font-semibold"
           >
             {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
@@ -154,7 +233,7 @@ export const AdmitCards: React.FC = () => {
           </button>
           <button
             onClick={handlePrintAll}
-            disabled={isSaving || isLoading}
+            disabled={isSaving || isLoading || !selectedScl}
             className="flex items-center text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl shadow-md cursor-pointer disabled:opacity-50"
           >
             <Printer className="w-4 h-4 mr-1.5" />
@@ -164,34 +243,86 @@ export const AdmitCards: React.FC = () => {
       </div>
 
       {/* Filter Options (Hidden on Print) */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6 no-print">
-        <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Scholarship Session</label>
-          <select
-            value={selectedSch}
-            disabled={isLoading}
-            onChange={(e) => setSelectedSch(e.target.value)}
-            className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none disabled:opacity-50"
-          >
-            {dbScholarships.map(s => (
-              <option key={s.id} value={s.id}>{s.name} ({s.academic_year})</option>
-            ))}
-          </select>
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5 no-print">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Scholarship Session</label>
+            <select
+              value={selectedSch}
+              disabled={isLoading}
+              onChange={(e) => setSelectedSch(e.target.value)}
+              className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none disabled:opacity-50"
+            >
+              {dbScholarships.map(s => (
+                <option key={s.id} value={s.id}>{s.name} ({s.academic_year})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Filter by School <span className="text-red-500">*</span></label>
+            <select
+              value={selectedScl}
+              disabled={isLoading}
+              onChange={(e) => setSelectedScl(e.target.value)}
+              className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none disabled:opacity-50"
+            >
+              <option value="">-- Select School --</option>
+              {dbSchools.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Filter by School</label>
-          <select
-            value={selectedScl}
-            disabled={isLoading}
-            onChange={(e) => setSelectedScl(e.target.value)}
-            className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none disabled:opacity-50"
-          >
-            <option value="">All Schools</option>
-            {dbSchools.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
+
+        {selectedScl ? (
+          <div className="border-t border-slate-100 pt-4 space-y-4">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Configure Examination Schedule</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Exam Date <span className="text-red-500">*</span></label>
+                <input
+                  type="date"
+                  value={examDateInput}
+                  onChange={(e) => setExamDateInput(e.target.value)}
+                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Start Time (24h) <span className="text-red-500">*</span></label>
+                <input
+                  type="time"
+                  value={examStartTime}
+                  onChange={(e) => setExamStartTime(e.target.value)}
+                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">End Time (24h) <span className="text-red-500">*</span></label>
+                <input
+                  type="time"
+                  value={examEndTime}
+                  onChange={(e) => setExamEndTime(e.target.value)}
+                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Calculated Reporting Time</label>
+                <div className="w-full border border-blue-100 bg-blue-50/50 p-2.5 text-sm font-extrabold text-blue-700 rounded-lg text-center">
+                  {calculatedReportingTime || '--:--'}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="border-t border-slate-100 pt-4 text-center">
+            <p className="text-xs text-amber-600 font-semibold bg-amber-50 border border-amber-100 rounded-xl p-3 inline-block">
+              ⚠️ Please select a specific school in the dropdown above to schedule the exam date & time and enable generate/print actions.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Candidates List (Hidden on Print) */}
@@ -278,7 +409,7 @@ export const AdmitCards: React.FC = () => {
               </div>
 
               <div className="text-[9px] font-bold mt-2 border-t pt-1">
-                Instructions: Bring Admit Card and School Identity card. Report 30 min before schedule. BALLPOINT PEN ONLY.
+                Instructions: Bring Admit Card and School Identity card. Report at {item.card?.reporting_time || '30 min before schedule'}. BALLPOINT PEN ONLY.
               </div>
 
               <div className="mt-6 flex justify-between items-end text-[9px] font-bold">

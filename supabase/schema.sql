@@ -16,7 +16,7 @@
 
 -- 1. Profiles Table (extending Supabase auth.users)
 CREATE TABLE profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+  id UUID PRIMARY KEY,
   name VARCHAR NOT NULL,
   role VARCHAR NOT NULL DEFAULT 'Viewer' CHECK (role IN ('SuperAdmin', 'Admin', 'ScholarshipCoordinator', 'MarksEvaluator', 'Invigilator', 'DataEntryOperator', 'Viewer')),
   contact_number VARCHAR,

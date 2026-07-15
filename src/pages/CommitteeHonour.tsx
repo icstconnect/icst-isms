@@ -80,8 +80,14 @@ export const CommitteeHonour: React.FC = () => {
               <div key={off.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-6 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center space-x-4">
-                    <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xl border-2 border-blue-200 shadow shadow-blue-600/10">
-                      {off.name.charAt(0)}
+                    <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center font-bold border-2 border-blue-200 shadow shadow-blue-600/10 bg-slate-100 flex-shrink-0">
+                      {off.photo_url ? (
+                        <img src={off.photo_url} alt="Official Photo" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xl">
+                          {off.name.charAt(0)}
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-extrabold text-slate-800 text-lg truncate">{off.name}</h3>

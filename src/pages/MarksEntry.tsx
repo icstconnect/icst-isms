@@ -18,14 +18,13 @@ export const MarksEntry: React.FC = () => {
 
   const [selectedSch, setSelectedSch] = useState('');
   const [selectedScl, setSelectedScl] = useState('');
-  const [selectedSub, setSelectedSub] = useState('');
 
   // Admin lock toggles (state holds local locks; SuperAdmin/Admin can toggle them)
   const [marksEntryEnabled] = useState(true);
   const [marksEditingEnabled, setMarksEditingEnabled] = useState(true);
   
-  // Local changes temp buffer
-  const [localScores, setLocalScores] = useState<Record<string, number | 'AB'>>({});
+  // Local changes temp buffer: key is `studentId_subjectId` -> score
+  const [localScores, setLocalScores] = useState<Record<string, number | ''>>({});
   const [localComponentScores, setLocalComponentScores] = useState<Record<string, Record<string, number>>>({});
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,27 +79,7 @@ export const MarksEntry: React.FC = () => {
     return dbSubjects.filter(s => s.scholarship_id === selectedSch);
   }, [dbSubjects, selectedSch]);
 
-  // Sync selectedSub when subjects list changes
-  useEffect(() => {
-    if (subjects.length > 0) {
-      if (!selectedSub || !subjects.some(s => s.id === selectedSub)) {
-        setSelectedSub(subjects[0].id);
-      }
-    } else {
-      setSelectedSub('');
-    }
-  }, [subjects, selectedSub]);
-
-  // Load subject specifications
-  const activeSubjectSpec = useMemo(() => {
-    return subjects.find(s => s.id === selectedSub) || null;
-  }, [subjects, selectedSub]);
-
-  const hasDist = useMemo(() => {
-    return activeSubjectSpec?.marks_distribution && activeSubjectSpec.marks_distribution.length > 0;
-  }, [activeSubjectSpec]);
-
-  // Load student lists with their existing marks for this subject
+  // Load student lists with their existing marks for all subjects of this session
   const studentRows = useMemo(() => {
     const filteredStudents = dbStudents.filter(s => s.scholarship_id === selectedSch && s.school_id === selectedScl);
     
@@ -108,132 +87,87 @@ export const MarksEntry: React.FC = () => {
       const admitCard = dbAdmitCards.find((ac: any) => ac.student_id === student.id);
       const attend = dbAttendance.find(a => a.student_id === student.id);
       const isAbsent = attend?.status === 'Absent';
-      const markEntry = dbMarks.find(m => m.student_id === student.id && m.subject_id === selectedSub);
       
-      const scoreValue = isAbsent ? 'AB' : (markEntry ? markEntry.marks_obtained : '');
+      const marksMap: Record<string, { id: string | null, score: number | '' }> = {};
+      
+      subjects.forEach(sub => {
+        const markEntry = dbMarks.find(m => m.student_id === student.id && m.subject_id === sub.id);
+        marksMap[sub.id] = {
+          id: markEntry?.id || null,
+          score: isAbsent ? '' : (markEntry?.marks_obtained !== undefined && markEntry.marks_obtained !== null ? markEntry.marks_obtained : '')
+        };
+      });
 
       return {
         student,
         admitCard,
         isAbsent,
-        scoreValue,
-        markId: markEntry?.id || null,
-        componentMarks: markEntry?.component_marks || null
+        marksMap
       };
     });
-  }, [dbStudents, dbMarks, dbAttendance, dbAdmitCards, selectedSch, selectedScl, selectedSub]);
+  }, [dbStudents, dbMarks, dbAttendance, dbAdmitCards, selectedSch, selectedScl, subjects]);
 
-  const getComponentScore = (studentId: string, componentName: string, savedComponentMarks: any) => {
-    if (localComponentScores[studentId]?.[componentName] !== undefined) {
-      return localComponentScores[studentId][componentName] === null ? '' : localComponentScores[studentId][componentName];
+  const getSubjectScore = (studentId: string, subjectId: string, savedScore: number | '') => {
+    const key = `${studentId}_${subjectId}`;
+    if (localScores[key] !== undefined) {
+      return localScores[key];
     }
-    if (savedComponentMarks?.[componentName] !== undefined) {
-      return savedComponentMarks[componentName];
-    }
-    return '';
+    return savedScore;
   };
 
-  const calculateTotalFromComponents = (scores: Record<string, number>, distribution: any[]): number | null => {
-    let sum = 0;
-    let hasEntries = false;
-    distribution.forEach(item => {
-      const val = scores[item.name];
-      if (val !== undefined && val !== null) {
-        sum += val;
-        hasEntries = true;
-      }
-    });
-    return hasEntries ? sum : null;
-  };
-
-  const handleScoreChange = (studentId: string, value: string, isAbsent: boolean) => {
+  const handleScoreChange = (studentId: string, subjectId: string, value: string, isAbsent: boolean, maxMarks: number) => {
     if (isAbsent) return; 
 
+    const key = `${studentId}_${subjectId}`;
     if (value === '') {
       const copy = { ...localScores };
-      delete copy[studentId];
+      delete copy[key];
       setLocalScores(copy);
       return;
     }
 
     const numericVal = parseFloat(value);
-    const maxMarks = activeSubjectSpec?.full_marks || 100;
-
     if (isNaN(numericVal) || numericVal < 0 || numericVal > maxMarks) {
       return; 
     }
 
     setLocalScores({
       ...localScores,
-      [studentId]: numericVal
+      [key]: numericVal
     });
   };
 
-  const handleComponentScoreChange = (
-    studentId: string,
-    componentName: string,
-    value: string,
-    maxMarks: number,
-    savedComponentMarks: any
-  ) => {
-    const currentStudentScores = {
-      ...savedComponentMarks,
-      ...(localComponentScores[studentId] || {})
-    };
+  const getStudentTotalAndStatus = (studentId: string, marksMap: Record<string, { id: string | null, score: number | '' }>) => {
+    let totalObtained = 0;
+    let totalFull = 0;
+    let hasGradedAll = true;
+    let passedAll = true;
+    let hasAnyMark = false;
 
-    if (value === '') {
-      delete currentStudentScores[componentName];
-      const updatedLocal = { ...(localComponentScores[studentId] || {}) };
-      delete updatedLocal[componentName];
+    subjects.forEach(sub => {
+      const saved = marksMap[sub.id]?.score;
+      const score = getSubjectScore(studentId, sub.id, saved);
       
-      const newLocalComp = {
-        ...localComponentScores,
-        [studentId]: updatedLocal
-      };
-      setLocalComponentScores(newLocalComp);
-
-      const total = calculateTotalFromComponents(currentStudentScores, activeSubjectSpec?.marks_distribution || []);
-      if (total === null) {
-        const copyTotal = { ...localScores };
-        delete copyTotal[studentId];
-        setLocalScores(copyTotal);
+      totalFull += sub.full_marks;
+      if (score === '' || score === null) {
+        hasGradedAll = false;
       } else {
-        setLocalScores({
-          ...localScores,
-          [studentId]: total
-        });
+        hasAnyMark = true;
+        const numScore = typeof score === 'number' ? score : parseFloat(score);
+        totalObtained += numScore;
+        if (numScore < sub.pass_marks) {
+          passedAll = false;
+        }
       }
-      return;
-    }
+    });
 
-    const numericVal = parseFloat(value);
-    if (isNaN(numericVal) || numericVal < 0 || numericVal > maxMarks) {
-      return; 
-    }
-
-    const updatedLocal = {
-      ...(localComponentScores[studentId] || {}),
-      [componentName]: numericVal
+    return {
+      totalObtained,
+      totalFull,
+      hasGradedAll,
+      passedAll,
+      hasAnyMark
     };
-
-    const newLocalComp = {
-      ...localComponentScores,
-      [studentId]: updatedLocal
-    };
-    setLocalComponentScores(newLocalComp);
-
-    const mergedScores = {
-      ...savedComponentMarks,
-      ...updatedLocal
-    };
-
-    const total = calculateTotalFromComponents(mergedScores, activeSubjectSpec?.marks_distribution || []);
-    if (total !== null) {
-      setLocalScores({
-        ...localScores,
-        [studentId]: total
-      });
-    }
   };
 
   const handleToggleAttendance = async (studentId: string, currentStatus: boolean) => {
@@ -287,24 +221,28 @@ export const MarksEntry: React.FC = () => {
 
     setDbAttendance(updatedAttendance);
 
-    // If marked absent, reset local scores
+    // If marked absent, reset all marks for this student
     if (newStatus === 'Absent') {
       const copy = { ...localScores };
-      delete copy[studentId];
+      Object.keys(copy).forEach(k => {
+        if (k.startsWith(`${studentId}_`)) {
+          delete copy[k];
+        }
+      });
       setLocalScores(copy);
 
       const copyComp = { ...localComponentScores };
       delete copyComp[studentId];
       setLocalComponentScores(copyComp);
       
-      const markEntry = dbMarks.find(m => m.student_id === studentId && m.subject_id === selectedSub);
-      if (markEntry) {
+      const studentMarks = dbMarks.filter(m => m.student_id === studentId);
+      if (studentMarks.length > 0) {
         if (isSupabaseConfigured && supabase) {
           try {
             const { error } = await supabase
               .from('marks')
               .update({ marks_obtained: null, component_marks: null })
-              .eq('id', markEntry.id);
+              .eq('student_id', studentId);
             if (error) throw error;
           } catch (err: any) {
             alert("Failed to reset marks in Supabase: " + err.message);
@@ -312,10 +250,14 @@ export const MarksEntry: React.FC = () => {
           }
         }
 
-        const updatedMark = mockDb.updateRecord<Mark>('marks', markEntry.id, { marks_obtained: null, component_marks: undefined });
-        if (updatedMark) {
-          setDbMarks(dbMarks.map(m => m.id === markEntry.id ? updatedMark : m));
-        }
+        let nextDbMarks = [...dbMarks];
+        studentMarks.forEach(markEntry => {
+          const updatedMark = mockDb.updateRecord<Mark>('marks', markEntry.id, { marks_obtained: null, component_marks: undefined });
+          if (updatedMark) {
+            nextDbMarks = nextDbMarks.map(m => m.id === markEntry.id ? updatedMark : m);
+          }
+        });
+        setDbMarks(nextDbMarks);
       }
     }
   };
@@ -324,24 +266,20 @@ export const MarksEntry: React.FC = () => {
     setIsSaving(true);
     let updatedMarks = [...dbMarks];
 
-    const savePromises = Object.keys(localScores).map(async studentId => {
-      const score = localScores[studentId];
-      if (score === 'AB') return;
-
-      const existingMark = dbMarks.find(m => m.student_id === studentId && m.subject_id === selectedSub);
+    // localScores maps "studentId_subjectId" -> score
+    const savePromises = Object.keys(localScores).map(async key => {
+      const [studentId, subjectId] = key.split('_');
+      const score = localScores[key];
       
-      const compScores = hasDist
-        ? {
-            ...(existingMark?.component_marks || {}),
-            ...(localComponentScores[studentId] || {})
-          }
-        : null;
+      if (score === '') return;
 
+      const existingMark = dbMarks.find(m => m.student_id === studentId && m.subject_id === subjectId);
+      
       const markData = {
         student_id: studentId,
-        subject_id: selectedSub,
+        subject_id: subjectId,
         marks_obtained: score,
-        component_marks: compScores,
+        component_marks: null,
         entered_by: user?.id || 'usr-1'
       };
 
@@ -378,7 +316,16 @@ export const MarksEntry: React.FC = () => {
 
     try {
       await Promise.all(savePromises);
-      setDbMarks(updatedMarks);
+      
+      if (isSupabaseConfigured && supabase) {
+        const { data: reloadRes, error: reloadErr } = await supabase.from('marks').select('*');
+        if (!reloadErr && reloadRes) {
+          setDbMarks(reloadRes);
+        }
+      } else {
+        setDbMarks(updatedMarks);
+      }
+
       setLocalScores({});
       setLocalComponentScores({});
       setSaveSuccess(true);
@@ -463,7 +410,7 @@ export const MarksEntry: React.FC = () => {
       )}
 
       {/* Filter panel */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Scholarship Session</label>
           <select
@@ -489,116 +436,91 @@ export const MarksEntry: React.FC = () => {
             ))}
           </select>
         </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Subject Selection</label>
-          <select
-            value={selectedSub}
-            onChange={(e) => { setSelectedSub(e.target.value); setLocalScores({}); setLocalComponentScores({}); }}
-            className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50 focus:outline-none"
-          >
-            {subjects.map(s => (
-              <option key={s.id} value={s.id}>{s.name} (Max: {s.full_marks})</option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Table grid */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         {studentRows.length > 0 ? (
-          <table className="w-full text-left border-collapse text-sm">
+          <table className="w-full text-left border-collapse text-xs table-auto">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 font-semibold text-slate-600">Candidate Name</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Exam Roll</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Attendance Status</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Marks Obtained</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Status</th>
+                <th className="p-2 py-3 font-semibold text-slate-600">Candidate Name</th>
+                <th className="p-2 py-3 font-semibold text-slate-600 text-center">Exam Roll</th>
+                <th className="p-2 py-3 font-semibold text-slate-600 text-center">Attendance</th>
+                {subjects.map(sub => (
+                  <th key={sub.id} className="p-2 py-3 font-semibold text-slate-600 text-center">
+                    {sub.name} (Max: {sub.full_marks})
+                  </th>
+                ))}
+                <th className="p-2 py-3 font-semibold text-slate-600 text-center font-bold">Total</th>
+                <th className="p-2 py-3 font-semibold text-slate-600 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {studentRows.map(row => {
-                const currentScore = localScores[row.student.id] !== undefined 
-                  ? localScores[row.student.id] 
-                  : row.scoreValue;
-
-                const passMarks = activeSubjectSpec?.pass_marks || 35;
-                const isPass = typeof currentScore === 'number' && currentScore >= passMarks;
+                const summary = getStudentTotalAndStatus(row.student.id, row.marksMap);
 
                 return (
                   <tr key={row.student.id} className="hover:bg-slate-50/50">
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800">{row.student.name}</div>
-                      <div className="text-xs text-slate-400">ID: {row.student.student_id}</div>
+                    <td className="p-2 py-2.5">
+                      <div className="font-bold text-slate-800 text-xs">{row.student.name}</div>
+                      <div className="text-[10px] text-slate-400">ID: {row.student.student_id}</div>
                     </td>
-                    <td className="p-4 text-center font-mono font-bold text-slate-700">
+                    <td className="p-2 py-2.5 text-center font-mono font-bold text-slate-700 text-xs">
                       {row.admitCard ? row.admitCard.roll_number : (
-                        <span className="text-xs text-red-500 font-semibold bg-red-50 px-2 py-0.5 rounded">No Admit Card</span>
+                        <span className="text-[10px] text-red-500 font-semibold bg-red-50 px-1.5 py-0.5 rounded">No Card</span>
                       )}
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-2 py-2.5 text-center">
                       <button
                         disabled={!isAuthorizedToEdit}
                         onClick={() => handleToggleAttendance(row.student.id, row.isAbsent)}
-                        className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                        className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer ${
                           row.isAbsent 
                             ? 'bg-red-50 text-red-600 border-red-200' 
                             : 'bg-green-50 text-green-600 border-green-200'
                         }`}
                       >
-                        {row.isAbsent ? 'ABSENT (AB)' : 'PRESENT'}
+                        {row.isAbsent ? 'ABSENT' : 'PRESENT'}
                       </button>
                     </td>
-                    <td className="p-4 text-center">
-                      {hasDist && activeSubjectSpec?.marks_distribution ? (
-                        <div className="flex flex-col items-center space-y-2">
-                          <div className="flex items-center justify-center space-x-3">
-                            {activeSubjectSpec.marks_distribution.map((comp) => {
-                              const compVal = getComponentScore(row.student.id, comp.name, row.componentMarks);
-                              return (
-                                <div key={comp.name} className="flex flex-col items-center">
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase">{comp.name} (/{comp.max_marks})</span>
-                                  <input
-                                    type="number"
-                                    disabled={row.isAbsent || !isAuthorizedToEdit || !row.admitCard}
-                                    placeholder="Score"
-                                    value={compVal}
-                                    onChange={(e) => handleComponentScoreChange(row.student.id, comp.name, e.target.value, comp.max_marks, row.componentMarks)}
-                                    className="w-16 text-center border border-slate-200 px-1 py-1 text-xs rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800 disabled:opacity-50 mt-1"
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {currentScore !== '' && currentScore !== null && (
-                            <div className="text-xs font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                              Total: {currentScore} / {activeSubjectSpec.full_marks}
-                            </div>
-                          )}
-                        </div>
+                    {subjects.map(sub => {
+                      const savedScore = row.marksMap[sub.id]?.score;
+                      const currentScore = getSubjectScore(row.student.id, sub.id, savedScore);
+
+                      return (
+                        <td key={sub.id} className="p-2 py-2.5 text-center">
+                          <input
+                            type="number"
+                            disabled={row.isAbsent || !isAuthorizedToEdit || !row.admitCard}
+                            placeholder={row.isAbsent ? 'AB' : 'Score'}
+                            value={currentScore === null ? '' : currentScore}
+                            onChange={(e) => handleScoreChange(row.student.id, sub.id, e.target.value, row.isAbsent, sub.full_marks)}
+                            className="w-14 text-center border border-slate-200 p-1 text-xs rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-extrabold text-slate-800 disabled:opacity-50"
+                          />
+                        </td>
+                      );
+                    })}
+                    <td className="p-2 py-2.5 text-center font-bold text-slate-700 text-xs">
+                      {row.isAbsent ? (
+                        <span className="text-[10px] text-slate-400 font-normal">AB</span>
+                      ) : summary.hasAnyMark ? (
+                        `${summary.totalObtained}/${summary.totalFull}`
                       ) : (
-                        <input
-                          type="number"
-                          disabled={row.isAbsent || !isAuthorizedToEdit || !row.admitCard}
-                          placeholder={row.isAbsent ? 'AB' : 'Score'}
-                          value={currentScore === 'AB' || currentScore === null ? '' : currentScore}
-                          onChange={(e) => handleScoreChange(row.student.id, e.target.value, row.isAbsent)}
-                          className="w-24 text-center border border-slate-200 px-2 py-1 text-sm rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-extrabold text-slate-800 disabled:opacity-50"
-                        />
+                        '-'
                       )}
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-2 py-2.5 text-center">
                       {row.isAbsent ? (
-                        <span className="text-red-600 font-bold text-xs bg-red-50 px-2.5 py-0.5 rounded">ABSENT</span>
-                      ) : typeof currentScore === 'number' ? (
-                        isPass ? (
-                          <span className="text-green-600 font-bold text-xs bg-green-50 px-2.5 py-0.5 rounded">PASS</span>
+                        <span className="text-red-600 font-bold text-[10px] bg-red-50 px-2 py-0.5 rounded">ABSENT</span>
+                      ) : summary.hasAnyMark ? (
+                        summary.passedAll ? (
+                          <span className="text-green-600 font-bold text-[10px] bg-green-50 px-2 py-0.5 rounded">PASS</span>
                         ) : (
-                          <span className="text-red-600 font-bold text-xs bg-red-50 px-2.5 py-0.5 rounded">FAIL</span>
+                          <span className="text-red-600 font-bold text-[10px] bg-red-50 px-2 py-0.5 rounded">FAIL</span>
                         )
                       ) : (
-                        <span className="text-slate-400 text-xs">-</span>
+                        <span className="text-slate-400 text-[10px]">-</span>
                       )}
                     </td>
                   </tr>

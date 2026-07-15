@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { mockDb, Profile } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { Users, Plus, Mail, Phone, Calendar, Pencil, Trash2, Key } from 'lucide-react';
+import { DatePicker } from '../components/DatePicker';
 
 export const Officials: React.FC = () => {
   const [officials, setOfficials] = useState<Profile[]>(mockDb.getData<Profile>('profiles'));
@@ -15,6 +16,15 @@ export const Officials: React.FC = () => {
   const [designation, setDesignation] = useState('');
   const [role, setRole] = useState<Profile['role']>('ScholarshipCoordinator');
   const [customUuid, setCustomUuid] = useState(''); // Custom UUID field for Supabase FK
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [joiningDate, setJoiningDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Photograph Cropping States
+  const [showCropper, setShowCropper] = useState(false);
+  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
+  const [cropScale, setCropScale] = useState(1.0);
+  const [cropX, setCropX] = useState(0);
+  const [cropY, setCropY] = useState(0);
 
   // Fetch officials from Supabase on mount if configured
   useEffect(() => {
@@ -37,6 +47,81 @@ export const Officials: React.FC = () => {
     fetchLiveOfficials();
   }, []);
 
+  const generateUUID = () => {
+    if (typeof window.crypto?.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setTempImageSrc(reader.result as string);
+        setCropScale(1.0);
+        setCropX(0);
+        setCropY(0);
+        setShowCropper(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropSave = () => {
+    if (!tempImageSrc) return;
+
+    const img = new Image();
+    img.src = tempImageSrc;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 350;
+      canvas.height = 450;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const imgRatio = img.width / img.height;
+      const targetRatio = 175 / 225;
+      let baseW = 175;
+      let baseH = 225;
+      if (imgRatio > targetRatio) {
+        baseH = 225;
+        baseW = 225 * imgRatio;
+      } else {
+        baseW = 175;
+        baseH = 175 / imgRatio;
+      }
+
+      const dw = baseW * cropScale * 2;
+      const dh = baseH * cropScale * 2;
+      const dx = 175 + cropX * 2 - dw / 2;
+      const dy = 225 + cropY * 2 - dh / 2;
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, 350, 450);
+      ctx.drawImage(img, dx, dy, dw, dh);
+
+      let quality = 0.8;
+      let dataUrl = canvas.toDataURL('image/jpeg', quality);
+      let sizeKb = Math.round((dataUrl.split(',')[1].length * 3) / 4 / 1024);
+
+      // Compress to stay under 100KB
+      while (sizeKb > 100 && quality > 0.1) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+        sizeKb = Math.round((dataUrl.split(',')[1].length * 3) / 4 / 1024);
+      }
+
+      setPhotoUrl(dataUrl);
+      setShowCropper(false);
+    };
+  };
+
   const clearForm = () => {
     setName('');
     setEmail('');
@@ -44,11 +129,20 @@ export const Officials: React.FC = () => {
     setDesignation('');
     setRole('ScholarshipCoordinator');
     setCustomUuid('');
+    setPhotoUrl(null);
+    setJoiningDate(new Date().toISOString().split('T')[0]);
+    setTempImageSrc(null);
+    setShowCropper(false);
   };
 
   const handleRegisterOrEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
+
+    if (!photoUrl) {
+      alert("Please upload a profile photograph for the committee member.");
+      return;
+    }
 
     if (editingOfficial) {
       // Edit Mode
@@ -57,7 +151,9 @@ export const Officials: React.FC = () => {
         email,
         contact_number: contact,
         designation,
-        role
+        role,
+        photo_url: photoUrl,
+        joining_date: joiningDate
       };
 
       if (isSupabaseConfigured && supabase) {
@@ -80,7 +176,7 @@ export const Officials: React.FC = () => {
       clearForm();
     } else {
       // Add/Register Mode
-      const targetId = customUuid.trim() || `usr-${officials.length + 1}`;
+      const targetId = customUuid.trim() || generateUUID();
       
       const newOfficialData = {
         id: targetId,
@@ -88,8 +184,8 @@ export const Officials: React.FC = () => {
         email,
         contact_number: contact,
         designation,
-        joining_date: new Date().toISOString().split('T')[0],
-        photo_url: null,
+        joining_date: joiningDate,
+        photo_url: photoUrl,
         role,
         status: 'Active' as const
       };
@@ -128,6 +224,8 @@ export const Officials: React.FC = () => {
     setDesignation(off.designation || '');
     setRole(off.role);
     setCustomUuid(off.id);
+    setPhotoUrl(off.photo_url || null);
+    setJoiningDate(off.joining_date || new Date().toISOString().split('T')[0]);
     setShowAddForm(true);
   };
 
@@ -189,7 +287,7 @@ export const Officials: React.FC = () => {
                 <span>Supabase Live Account Matching</span>
               </div>
               <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                Enter Supabase User ID (UUID) from Authentication Dashboard: <span className="text-red-500">*</span>
+                Enter Supabase User ID (UUID) from Authentication Dashboard (Optional):
               </label>
               <input
                 type="text"
@@ -197,10 +295,44 @@ export const Officials: React.FC = () => {
                 value={customUuid}
                 onChange={(e) => setCustomUuid(e.target.value)}
                 className="w-full border border-slate-200 p-2.5 text-xs rounded-lg bg-white"
-                required
               />
             </div>
           )}
+
+          {/* Photograph Upload (Mandatory) */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
+            <div className="w-16 h-16 rounded-full bg-slate-200 overflow-hidden border border-slate-300 flex-shrink-0 flex items-center justify-center">
+              {photoUrl ? (
+                <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-center px-1">No Image</span>
+              )}
+            </div>
+            <div className="flex-1 w-full space-y-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase">
+                Official Photograph <span className="text-red-500">*</span>
+              </label>
+              <p className="text-[10px] text-slate-400">Upload a recent professional photo (JPEG/PNG format, max 200KB).</p>
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="official-photo-file"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="official-photo-file"
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer shadow transition-colors"
+                >
+                  {photoUrl ? 'Change Photo' : 'Upload Photo'}
+                </label>
+                {photoUrl && (
+                  <span className="text-[10px] font-bold text-green-600">✓ Uploaded</span>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -253,20 +385,30 @@ export const Officials: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">System Access Role <span className="text-red-500">*</span></label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as any)}
-              className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-white"
-            >
-              <option value="SuperAdmin">Super Admin</option>
-              <option value="Admin">Admin</option>
-              <option value="ScholarshipCoordinator">Scholarship Coordinator</option>
-              <option value="MarksEvaluator">Marks Evaluator</option>
-              <option value="Invigilator">Invigilator</option>
-              <option value="DataEntryOperator">Data Entry Operator</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Joining Date <span className="text-red-500">*</span></label>
+              <DatePicker
+                value={joiningDate}
+                onChange={(val) => setJoiningDate(val)}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">System Access Role <span className="text-red-500">*</span></label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as any)}
+                className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-white"
+              >
+                <option value="SuperAdmin">Super Admin</option>
+                <option value="Admin">Admin</option>
+                <option value="ScholarshipCoordinator">Scholarship Coordinator</option>
+                <option value="MarksEvaluator">Marks Evaluator</option>
+                <option value="Invigilator">Invigilator</option>
+                <option value="DataEntryOperator">Data Entry Operator</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 pt-3">
@@ -315,8 +457,14 @@ export const Officials: React.FC = () => {
             </div>
 
             <div className="flex items-start space-x-4">
-              <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg border-2 border-blue-200 shadow">
-                {off.name ? off.name.charAt(0) : '?'}
+              <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center font-bold border-2 border-blue-200 shadow bg-slate-100 flex-shrink-0">
+                {off.photo_url ? (
+                  <img src={off.photo_url} alt="Official Photo" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
+                    {off.name ? off.name.charAt(0) : '?'}
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-w-0 pr-12">
                 <h3 className="text-base font-bold text-slate-800 truncate">{off.name}</h3>
@@ -344,6 +492,112 @@ export const Officials: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Photo Cropping Modal */}
+      {showCropper && tempImageSrc && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-sm w-full space-y-4">
+            <h3 className="text-base font-bold text-slate-800 border-b pb-2">Crop Official Photograph</h3>
+            
+            {/* Aspect Ratio Box Mask: 3.5 to 4.5 */}
+            <div className="flex justify-center">
+              <div className="w-[175px] h-[225px] border-2 border-blue-500 rounded-lg overflow-hidden bg-slate-900 relative shadow-inner">
+                <img
+                  src={tempImageSrc}
+                  alt="Source to crop"
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: `translate(-50%, -50%) translate(${cropX}px, ${cropY}px) scale(${cropScale})`,
+                    transformOrigin: 'center center',
+                    maxWidth: 'none',
+                    maxHeight: 'none',
+                    minWidth: '100%',
+                    minHeight: '100%',
+                    display: 'block',
+                    pointerEvents: 'none'
+                  }}
+                />
+                
+                {/* Visual guidelines */}
+                <div className="absolute inset-0 border border-white/20 pointer-events-none"></div>
+                <div className="absolute top-1/3 left-0 right-0 border-b border-dashed border-white/20 pointer-events-none"></div>
+                <div className="absolute top-2/3 left-0 right-0 border-b border-dashed border-white/20 pointer-events-none"></div>
+                <div className="absolute left-1/3 top-0 bottom-0 border-r border-dashed border-white/20 pointer-events-none"></div>
+                <div className="absolute left-2/3 top-0 bottom-0 border-r border-dashed border-white/20 pointer-events-none"></div>
+              </div>
+            </div>
+
+            {/* Sliders */}
+            <div className="space-y-3.5 text-xs font-semibold text-slate-600">
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span>Zoom / Scale:</span>
+                  <span className="font-mono text-slate-500">{cropScale.toFixed(2)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.05"
+                  value={cropScale}
+                  onChange={(e) => setCropScale(parseFloat(e.target.value))}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span>Horizontal (Pan X):</span>
+                  <span className="font-mono text-slate-500">{cropX}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="-150"
+                  max="150"
+                  value={cropX}
+                  onChange={(e) => setCropX(parseInt(e.target.value))}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span>Vertical (Pan Y):</span>
+                  <span className="font-mono text-slate-500">{cropY}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="-150"
+                  max="150"
+                  value={cropY}
+                  onChange={(e) => setCropY(parseInt(e.target.value))}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Modal actions */}
+            <div className="flex justify-end space-x-3 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setShowCropper(false)}
+                className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-xs px-4 py-2 rounded-lg font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCropSave}
+                className="text-white bg-blue-600 hover:bg-blue-500 text-xs px-4 py-2 rounded-lg font-bold shadow-md"
+              >
+                Crop & Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
