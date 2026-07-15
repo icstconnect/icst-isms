@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard } from '../services/mockDb';
 import { UserCheck, Printer, QrCode } from 'lucide-react';
+import { DatePicker } from '../components/DatePicker';
 
 export const SpecialReg: React.FC = () => {
   const schools = mockDb.getData<School>('schools');
@@ -143,11 +144,9 @@ export const SpecialReg: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Date of Birth <span className="text-red-500">*</span></label>
-                <input
-                  type="date"
+                <DatePicker
                   value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg"
+                  onChange={(val) => setDob(val)}
                   required
                 />
               </div>

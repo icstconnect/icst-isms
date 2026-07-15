@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockDb, Scholarship } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { Award, Plus, Calendar, Pencil, Trash2 } from 'lucide-react';
+import { Award, Plus, Calendar, Pencil, Trash2, Loader2 } from 'lucide-react';
 
 export const Scholarships: React.FC = () => {
   const [scholarships, setScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
@@ -12,6 +12,11 @@ export const Scholarships: React.FC = () => {
   const [name, setName] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
   const [description, setDescription] = useState('');
+
+  // Loading states
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
 
   // Fetch from Supabase on mount if configured
   useEffect(() => {
@@ -42,50 +47,46 @@ export const Scholarships: React.FC = () => {
 
   const handleAddOrEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSaving) return;
 
-    if (editingScholarship) {
-      // Edit
-      const updates = {
-        name,
-        academic_year: Number(year),
-        description
-      };
+    setIsSaving(true);
+    try {
+      if (editingScholarship) {
+        // Edit
+        const updates = {
+          name,
+          academic_year: Number(year),
+          description
+        };
 
-      if (isSupabaseConfigured && supabase) {
-        try {
+        if (isSupabaseConfigured && supabase) {
           const { error } = await supabase
             .from('scholarships')
             .update(updates)
             .eq('id', editingScholarship.id);
           if (error) throw error;
-        } catch (err: any) {
-          alert(err.message || "Failed to update scholarship in Supabase.");
-          return;
         }
-      }
 
-      mockDb.updateRecord<Scholarship>('scholarships', editingScholarship.id, updates);
-      setScholarships(scholarships.map(s => s.id === editingScholarship.id ? { ...s, ...updates } : s));
-      setEditingScholarship(null);
-      setShowAddForm(false);
-      clearForm();
-    } else {
-      // Add
-      const newSchData = {
-        name,
-        academic_year: Number(year),
-        description,
-        registration_start: new Date().toISOString(),
-        registration_end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-        admit_card_publish_date: new Date(Date.now() + 100 * 24 * 60 * 60 * 1000).toISOString(),
-        result_publish_date: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'Draft' as const
-      };
+        mockDb.updateRecord<Scholarship>('scholarships', editingScholarship.id, updates);
+        setScholarships(scholarships.map(s => s.id === editingScholarship.id ? { ...s, ...updates } : s));
+        setEditingScholarship(null);
+        setShowAddForm(false);
+        clearForm();
+      } else {
+        // Add
+        const newSchData = {
+          name,
+          academic_year: Number(year),
+          description,
+          registration_start: new Date().toISOString(),
+          registration_end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+          admit_card_publish_date: new Date(Date.now() + 100 * 24 * 60 * 60 * 1000).toISOString(),
+          result_publish_date: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'Draft' as const
+        };
 
-      let insertedId = `sch-${Date.now()}`;
-      if (isSupabaseConfigured && supabase) {
-        try {
+        let insertedId = `sch-${Date.now()}`;
+        if (isSupabaseConfigured && supabase) {
           const { data, error } = await supabase
             .from('scholarships')
             .insert(newSchData)
@@ -95,19 +96,20 @@ export const Scholarships: React.FC = () => {
           if (data) {
             insertedId = data.id;
           }
-        } catch (err: any) {
-          alert(err.message || "Failed to insert scholarship into Supabase.");
-          return;
         }
-      }
 
-      const newSch = mockDb.addRecord<Scholarship>('scholarships', {
-        id: insertedId,
-        ...newSchData
-      });
-      setScholarships([...scholarships, newSch]);
-      setShowAddForm(false);
-      clearForm();
+        const newSch = mockDb.addRecord<Scholarship>('scholarships', {
+          id: insertedId,
+          ...newSchData
+        });
+        setScholarships([...scholarships, newSch]);
+        setShowAddForm(false);
+        clearForm();
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to save scholarship.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -122,40 +124,44 @@ export const Scholarships: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this scholarship? All related subjects, students, marks and logs will be permanently deleted.")) return;
 
-    if (isSupabaseConfigured && supabase) {
-      try {
+    setDeletingId(id);
+    try {
+      if (isSupabaseConfigured && supabase) {
         const { error } = await supabase
           .from('scholarships')
           .delete()
           .eq('id', id);
         if (error) throw error;
-      } catch (err: any) {
-        alert(err.message || "Failed to delete scholarship from Supabase.");
-        return;
       }
-    }
 
-    mockDb.deleteRecord('scholarships', id);
-    setScholarships(scholarships.filter(s => s.id !== id));
+      mockDb.deleteRecord('scholarships', id);
+      setScholarships(scholarships.filter(s => s.id !== id));
+    } catch (err: any) {
+      alert(err.message || "Failed to delete scholarship.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleStatusChange = async (id: string, newStatus: Scholarship['status']) => {
-    if (isSupabaseConfigured && supabase) {
-      try {
+    setStatusChangingId(id);
+    try {
+      if (isSupabaseConfigured && supabase) {
         const { error } = await supabase
           .from('scholarships')
           .update({ status: newStatus })
           .eq('id', id);
         if (error) throw error;
-      } catch (err: any) {
-        alert(err.message || "Failed to update status in Supabase.");
-        return;
       }
-    }
 
-    const updated = mockDb.updateRecord<Scholarship>('scholarships', id, { status: newStatus });
-    if (updated) {
-      setScholarships(scholarships.map(s => s.id === id ? updated : s));
+      const updated = mockDb.updateRecord<Scholarship>('scholarships', id, { status: newStatus });
+      if (updated) {
+        setScholarships(scholarships.map(s => s.id === id ? updated : s));
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to update status.");
+    } finally {
+      setStatusChangingId(null);
     }
   };
 
@@ -224,20 +230,23 @@ export const Scholarships: React.FC = () => {
           <div className="flex justify-end space-x-3">
             <button
               type="button"
+              disabled={isSaving}
               onClick={() => {
                 setEditingScholarship(null);
                 clearForm();
                 setShowAddForm(false);
               }}
-              className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-sm px-4 py-2 rounded-lg"
+              className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-sm px-4 py-2 rounded-lg disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="text-white bg-blue-600 hover:bg-blue-500 text-sm px-4 py-2 rounded-lg"
+              disabled={isSaving}
+              className="text-white bg-blue-600 hover:bg-blue-500 text-sm px-4 py-2 rounded-lg flex items-center disabled:opacity-50 font-semibold"
             >
-              {editingScholarship ? 'Save Changes' : 'Save Session'}
+              {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+              {editingScholarship ? (isSaving ? 'Saving Changes...' : 'Save Changes') : (isSaving ? 'Saving Session...' : 'Save Session')}
             </button>
           </div>
         </form>
@@ -251,17 +260,23 @@ export const Scholarships: React.FC = () => {
             <div className="absolute top-4 right-4 flex space-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => handleStartEdit(s)}
+                disabled={deletingId !== null || statusChangingId !== null}
                 title="Edit Session"
-                className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm"
+                className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm disabled:opacity-50"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => handleDelete(s.id)}
+                disabled={deletingId !== null}
                 title="Delete Session"
-                className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm"
+                className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm disabled:opacity-50"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                {deletingId === s.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
               </button>
             </div>
 
@@ -286,37 +301,46 @@ export const Scholarships: React.FC = () => {
                 Reg ends: {new Date(s.registration_end).toLocaleDateString()}
               </span>
               <div className="flex items-center space-x-2">
-                {s.status === 'Draft' && (
-                  <button
-                    onClick={() => handleStatusChange(s.id, 'Active')}
-                    className="text-blue-600 hover:underline font-semibold cursor-pointer"
-                  >
-                    Activate
-                  </button>
-                )}
-                {s.status === 'Active' && (
-                  <button
-                    onClick={() => handleStatusChange(s.id, 'AdmitCardsGenerated')}
-                    className="text-blue-600 hover:underline font-semibold cursor-pointer"
-                  >
-                    Generate Admit Cards
-                  </button>
-                )}
-                {s.status === 'AdmitCardsGenerated' && (
-                  <button
-                    onClick={() => handleStatusChange(s.id, 'MarksEntry')}
-                    className="text-amber-600 hover:underline font-semibold cursor-pointer"
-                  >
-                    Enable Marks Entry
-                  </button>
-                )}
-                {s.status === 'MarksEntry' && (
-                  <button
-                    onClick={() => handleStatusChange(s.id, 'ResultsPublished')}
-                    className="text-green-600 hover:underline font-semibold cursor-pointer"
-                  >
-                    Publish Results
-                  </button>
+                {statusChangingId === s.id ? (
+                  <div className="flex items-center space-x-1 text-blue-600 font-semibold">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Updating...</span>
+                  </div>
+                ) : (
+                  <>
+                    {s.status === 'Draft' && (
+                      <button
+                        onClick={() => handleStatusChange(s.id, 'Active')}
+                        className="text-blue-600 hover:underline font-semibold cursor-pointer"
+                      >
+                        Activate
+                      </button>
+                    )}
+                    {s.status === 'Active' && (
+                      <button
+                        onClick={() => handleStatusChange(s.id, 'AdmitCardsGenerated')}
+                        className="text-blue-600 hover:underline font-semibold cursor-pointer"
+                      >
+                        Generate Admit Cards
+                      </button>
+                    )}
+                    {s.status === 'AdmitCardsGenerated' && (
+                      <button
+                        onClick={() => handleStatusChange(s.id, 'MarksEntry')}
+                        className="text-amber-600 hover:underline font-semibold cursor-pointer"
+                      >
+                        Enable Marks Entry
+                      </button>
+                    )}
+                    {s.status === 'MarksEntry' && (
+                      <button
+                        onClick={() => handleStatusChange(s.id, 'ResultsPublished')}
+                        className="text-green-600 hover:underline font-semibold cursor-pointer"
+                      >
+                        Publish Results
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

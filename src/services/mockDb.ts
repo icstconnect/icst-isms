@@ -54,17 +54,27 @@ export interface Student {
   scholarship_id: string;
   school_id: string;
   name: string;
-  father_name: string;
-  mother_name: string;
+  father_name?: string | null;
+  mother_name?: string | null;
   dob: string;
   gender: 'Male' | 'Female' | 'Other';
   class: string;
   section: string;
   school_roll_no: string;
   guardian_contact: string;
-  address: string;
+  address?: string | null;
   photo_url: string | null;
   is_special_registration: boolean;
+  form_number?: string | null;
+  guardian_name?: string | null;
+  aadhaar_no?: string | null;
+  whatsapp_no?: string | null;
+  village?: string | null;
+  post_office?: string | null;
+  police_station?: string | null;
+  district?: string | null;
+  state?: string | null;
+  pin_code?: string | null;
   created_at: string;
 }
 

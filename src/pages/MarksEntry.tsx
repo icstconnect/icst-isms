@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, Subject, Mark, Attendance } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Database, ShieldAlert, CheckCircle, Save, Lock, Unlock, Layers } from 'lucide-react';
+import { Database, ShieldAlert, CheckCircle, Save, Lock, Unlock, Layers, Loader2 } from 'lucide-react';
 
 export const MarksEntry: React.FC = () => {
   const { user } = useAuth();
@@ -28,6 +28,7 @@ export const MarksEntry: React.FC = () => {
   const [localScores, setLocalScores] = useState<Record<string, number | 'AB'>>({});
   const [localComponentScores, setLocalComponentScores] = useState<Record<string, Record<string, number>>>({});
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Fetch all databases from Supabase if configured
   useEffect(() => {
@@ -320,6 +321,7 @@ export const MarksEntry: React.FC = () => {
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
     let updatedMarks = [...dbMarks];
 
     const savePromises = Object.keys(localScores).map(async studentId => {
@@ -383,6 +385,8 @@ export const MarksEntry: React.FC = () => {
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) {
       console.error("Save transaction error:", e);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -427,11 +431,15 @@ export const MarksEntry: React.FC = () => {
 
           <button
             onClick={handleSave}
-            disabled={!isAuthorizedToEdit || Object.keys(localScores).length === 0}
+            disabled={!isAuthorizedToEdit || Object.keys(localScores).length === 0 || isSaving}
             className="flex items-center text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-xl shadow-md cursor-pointer disabled:opacity-50 transition-colors"
           >
-            <Save className="w-4 h-4 mr-1.5" />
-            Save Entries
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-1.5" />
+            )}
+            {isSaving ? 'Saving...' : 'Save Entries'}
           </button>
         </div>
       </div>

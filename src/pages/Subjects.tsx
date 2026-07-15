@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Subject, Scholarship } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { BookOpen, Plus, BookCheck, ClipboardCopy, Pencil, Trash2, ChevronUp, ChevronDown, Layers } from 'lucide-react';
+import { BookOpen, Plus, BookCheck, ClipboardCopy, Pencil, Trash2, ChevronUp, ChevronDown, Layers, Loader2 } from 'lucide-react';
 
 export const Subjects: React.FC = () => {
   const scholarships = mockDb.getData<Scholarship>('scholarships');
@@ -23,6 +23,11 @@ export const Subjects: React.FC = () => {
   // Marks Distribution states
   const [useDistribution, setUseDistribution] = useState(false);
   const [distItems, setDistItems] = useState<{ name: string; max_marks: number }[]>([]);
+
+  // Loading states
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
 
   // Fetch live subjects from Supabase on mount/scholarship change
   useEffect(() => {
@@ -135,28 +140,24 @@ export const Subjects: React.FC = () => {
       marks_distribution: useDistribution && distItems.length > 0 ? distItems : null
     };
 
-    if (editingSubject) {
-      // Update Mode
-      if (isSupabaseConfigured && supabase) {
-        try {
+    setIsSaving(true);
+    try {
+      if (editingSubject) {
+        // Update Mode
+        if (isSupabaseConfigured && supabase) {
           const { error } = await supabase
             .from('subjects')
             .update(subData)
             .eq('id', editingSubject.id);
           if (error) throw error;
-        } catch (err: any) {
-          alert(err.message || "Failed to update subject in Supabase.");
-          return;
         }
-      }
 
-      mockDb.updateRecord<Subject>('subjects', editingSubject.id, subData);
-      setSubjects(subjects.map(s => s.id === editingSubject.id ? { ...s, ...subData } : s));
-    } else {
-      // Add Mode
-      let insertedId = `sub-${Date.now()}`;
-      if (isSupabaseConfigured && supabase) {
-        try {
+        mockDb.updateRecord<Subject>('subjects', editingSubject.id, subData);
+        setSubjects(subjects.map(s => s.id === editingSubject.id ? { ...s, ...subData } : s));
+      } else {
+        // Add Mode
+        let insertedId = `sub-${Date.now()}`;
+        if (isSupabaseConfigured && supabase) {
           const { data, error } = await supabase
             .from('subjects')
             .insert(subData)
@@ -166,47 +167,50 @@ export const Subjects: React.FC = () => {
           if (data) {
             insertedId = data.id;
           }
-        } catch (err: any) {
-          alert(err.message || "Failed to save subject to Supabase.");
-          return;
         }
+
+        const newSub = mockDb.addRecord<Subject>('subjects', {
+          id: insertedId,
+          ...subData
+        });
+        setSubjects([...subjects, newSub]);
       }
 
-      const newSub = mockDb.addRecord<Subject>('subjects', {
-        id: insertedId,
-        ...subData
-      });
-      setSubjects([...subjects, newSub]);
+      setShowAddForm(false);
+      resetForm();
+    } catch (err: any) {
+      alert(err.message || "Failed to save subject.");
+    } finally {
+      setIsSaving(false);
     }
-
-    setShowAddForm(false);
-    resetForm();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this subject? All related candidate marks will be permanently deleted.")) return;
 
-    if (isSupabaseConfigured && supabase) {
-      try {
+    setDeletingId(id);
+    try {
+      if (isSupabaseConfigured && supabase) {
         const { error } = await supabase
           .from('subjects')
           .delete()
           .eq('id', id);
         if (error) throw error;
-      } catch (err: any) {
-        alert(err.message || "Failed to delete subject from Supabase.");
-        return;
       }
+
+      mockDb.deleteRecord('subjects', id);
+      
+      // Clean up local mock database student marks for this subject
+      const allMarks = mockDb.getData<any>('marks');
+      const filteredMarks = allMarks.filter((m: any) => m.subject_id !== id);
+      mockDb.setData('marks', filteredMarks);
+
+      setSubjects(subjects.filter(s => s.id !== id));
+    } catch (err: any) {
+      alert(err.message || "Failed to delete subject.");
+    } finally {
+      setDeletingId(null);
     }
-
-    mockDb.deleteRecord('subjects', id);
-    
-    // Clean up local mock database student marks for this subject
-    const allMarks = mockDb.getData<any>('marks');
-    const filteredMarks = allMarks.filter((m: any) => m.subject_id !== id);
-    mockDb.setData('marks', filteredMarks);
-
-    setSubjects(subjects.filter(s => s.id !== id));
   };
 
   const handleMoveOrder = async (sub: Subject, direction: 'up' | 'down') => {
@@ -221,8 +225,9 @@ export const Subjects: React.FC = () => {
     const currentOrder = sub.display_order;
     const targetOrder = targetSub.display_order;
 
-    if (isSupabaseConfigured && supabase) {
-      try {
+    setMovingId(sub.id);
+    try {
+      if (isSupabaseConfigured && supabase) {
         const { error: err1 } = await supabase
           .from('subjects')
           .update({ display_order: targetOrder })
@@ -234,20 +239,21 @@ export const Subjects: React.FC = () => {
           .update({ display_order: currentOrder })
           .eq('id', targetSub.id);
         if (err2) throw err2;
-      } catch (err: any) {
-        alert(err.message || "Failed to reorder subjects in Supabase.");
-        return;
       }
+
+      mockDb.updateRecord<Subject>('subjects', sub.id, { display_order: targetOrder });
+      mockDb.updateRecord<Subject>('subjects', targetSub.id, { display_order: currentOrder });
+
+      setSubjects(subjects.map(s => {
+        if (s.id === sub.id) return { ...s, display_order: targetOrder };
+        if (s.id === targetSub.id) return { ...s, display_order: currentOrder };
+        return s;
+      }));
+    } catch (err: any) {
+      alert(err.message || "Failed to reorder subjects.");
+    } finally {
+      setMovingId(null);
     }
-
-    mockDb.updateRecord<Subject>('subjects', sub.id, { display_order: targetOrder });
-    mockDb.updateRecord<Subject>('subjects', targetSub.id, { display_order: currentOrder });
-
-    setSubjects(subjects.map(s => {
-      if (s.id === sub.id) return { ...s, display_order: targetOrder };
-      if (s.id === targetSub.id) return { ...s, display_order: currentOrder };
-      return s;
-    }));
   };
 
   const loadPredefinedWBBSE = async () => {
@@ -272,10 +278,11 @@ export const Subjects: React.FC = () => {
       ...item
     }));
 
-    let addedList: Subject[] = [];
+    setIsSaving(true);
+    try {
+      let addedList: Subject[] = [];
 
-    if (isSupabaseConfigured && supabase) {
-      try {
+      if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
           .from('subjects')
           .insert(insertData)
@@ -284,24 +291,25 @@ export const Subjects: React.FC = () => {
         if (data) {
           addedList = data;
         }
-      } catch (err: any) {
-        alert(err.message || "Failed to load predefined subjects in Supabase.");
-        return;
+      } else {
+        insertData.forEach(item => {
+          const added = mockDb.addRecord<Subject>('subjects', item);
+          addedList.push(added);
+        });
       }
-    } else {
-      insertData.forEach(item => {
-        const added = mockDb.addRecord<Subject>('subjects', item);
-        addedList.push(added);
-      });
-    }
 
-    if (isSupabaseConfigured && supabase) {
-      addedList.forEach(item => {
-        mockDb.addRecord<Subject>('subjects', item);
-      });
-    }
+      if (isSupabaseConfigured && supabase) {
+        addedList.forEach(item => {
+          mockDb.addRecord<Subject>('subjects', item);
+        });
+      }
 
-    setSubjects([...subjects, ...addedList]);
+      setSubjects([...subjects, ...addedList]);
+    } catch (err: any) {
+      alert(err.message || "Failed to load predefined subjects.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -317,11 +325,15 @@ export const Subjects: React.FC = () => {
         <div className="flex space-x-3">
           <button
             onClick={loadPredefinedWBBSE}
-            disabled={!selectedSch}
+            disabled={!selectedSch || isSaving}
             className="flex items-center text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
           >
-            <ClipboardCopy className="w-4 h-4 mr-1.5" />
-            Load WBBSE Defaults
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+            ) : (
+              <ClipboardCopy className="w-4 h-4 mr-1.5" />
+            )}
+            {isSaving ? 'Loading...' : 'Load WBBSE Defaults'}
           </button>
           <button
             onClick={() => {
@@ -525,19 +537,22 @@ export const Subjects: React.FC = () => {
           <div className="flex justify-end space-x-3">
             <button
               type="button"
+              disabled={isSaving}
               onClick={() => {
                 setShowAddForm(false);
                 resetForm();
               }}
-              className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-sm px-4 py-2 rounded-lg"
+              className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-sm px-4 py-2 rounded-lg disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="text-white bg-blue-600 hover:bg-blue-500 text-sm px-4 py-2 rounded-lg font-semibold"
+              disabled={isSaving}
+              className="text-white bg-blue-600 hover:bg-blue-500 text-sm px-4 py-2 rounded-lg font-semibold flex items-center disabled:opacity-50"
             >
-              {editingSubject ? 'Save Changes' : 'Save Subject'}
+              {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+              {editingSubject ? (isSaving ? 'Saving Changes...' : 'Save Changes') : (isSaving ? 'Saving Subject...' : 'Save Subject')}
             </button>
           </div>
         </form>
@@ -595,33 +610,47 @@ export const Subjects: React.FC = () => {
                     <div className="flex justify-end items-center space-x-1.5">
                       <button
                         onClick={() => handleMoveOrder(sub, 'up')}
-                        disabled={index === 0}
+                        disabled={index === 0 || movingId !== null}
                         title="Move Up"
                         className="p-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-30 rounded border border-slate-200 text-slate-500 cursor-pointer"
                       >
-                        <ChevronUp className="w-3.5 h-3.5" />
+                        {movingId === sub.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                        ) : (
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        )}
                       </button>
                       <button
                         onClick={() => handleMoveOrder(sub, 'down')}
-                        disabled={index === activeSubjects.length - 1}
+                        disabled={index === activeSubjects.length - 1 || movingId !== null}
                         title="Move Down"
                         className="p-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-30 rounded border border-slate-200 text-slate-500 cursor-pointer"
                       >
-                        <ChevronDown className="w-3.5 h-3.5" />
+                        {movingId === sub.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        )}
                       </button>
                       <button
                         onClick={() => handleStartEdit(sub)}
+                        disabled={isSaving || deletingId !== null || movingId !== null}
                         title="Edit Subject"
-                        className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm ml-1"
+                        className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm ml-1 disabled:opacity-50"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(sub.id)}
+                        disabled={deletingId !== null}
                         title="Delete Subject"
-                        className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm"
+                        className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm disabled:opacity-50"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        {deletingId === sub.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
                   </td>

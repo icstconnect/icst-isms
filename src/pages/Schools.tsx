@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockDb, School } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { School as SchoolIcon, Plus, Mail, Phone, MapPin, Search, Pencil, Trash2 } from 'lucide-react';
+import { School as SchoolIcon, Plus, Mail, Phone, MapPin, Search, Pencil, Trash2, Loader2 } from 'lucide-react';
 
 export const Schools: React.FC = () => {
   const [schools, setSchools] = useState<School[]>(mockDb.getData<School>('schools'));
@@ -19,6 +19,10 @@ export const Schools: React.FC = () => {
   const [hmName, setHmName] = useState('');
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
+
+  // Loading states
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [filterQuery, setFilterQuery] = useState('');
 
@@ -58,62 +62,58 @@ export const Schools: React.FC = () => {
 
   const handleAddOrEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !udise.trim()) return;
+    if (!name.trim() || !udise.trim() || isSaving) return;
 
-    if (editingSchool) {
-      // Edit Mode
-      const updates = {
-        name,
-        udise,
-        type,
-        address,
-        district,
-        block,
-        pin,
-        headmaster_name: hmName,
-        contact_number: contact,
-        email
-      };
+    setIsSaving(true);
+    try {
+      if (editingSchool) {
+        // Edit Mode
+        const updates = {
+          name,
+          udise,
+          type,
+          address,
+          district,
+          block,
+          pin,
+          headmaster_name: hmName,
+          contact_number: contact,
+          email
+        };
 
-      if (isSupabaseConfigured && supabase) {
-        try {
+        if (isSupabaseConfigured && supabase) {
           const { error } = await supabase
             .from('schools')
             .update(updates)
             .eq('id', editingSchool.id);
           if (error) throw error;
-        } catch (err: any) {
-          alert(err.message || "Failed to update school in Supabase.");
-          return;
         }
-      }
 
-      mockDb.updateRecord<School>('schools', editingSchool.id, updates);
-      setSchools(schools.map(s => s.id === editingSchool.id ? { ...s, ...updates } : s));
-      setEditingSchool(null);
-      setShowAddForm(false);
-      clearForm();
-    } else {
-      // Add Mode
-      const nextId = `SCH-${String(schools.length + 1).padStart(4, '0')}`;
-      
-      const newSchoolData = {
-        school_id: nextId,
-        name,
-        udise,
-        type,
-        address,
-        district,
-        block,
-        pin,
-        headmaster_name: hmName,
-        contact_number: contact,
-        email
-      };
+        mockDb.updateRecord<School>('schools', editingSchool.id, updates);
+        setSchools(schools.map(s => s.id === editingSchool.id ? { ...s, ...updates } : s));
+        setEditingSchool(null);
+        setShowAddForm(false);
+        clearForm();
+      } else {
+        // Add Mode
+        const nextId = `SCH-${String(schools.length + 1).padStart(4, '0')}`;
+        
+        const newSchoolData = {
+          school_id: nextId,
+          name,
+          udise,
+          type,
+          address,
+          district,
+          block,
+          pin,
+          headmaster_name: hmName,
+          contact_number: contact,
+          email
+        };
 
-      let insertedId = `scl-${Date.now()}`;
-      if (isSupabaseConfigured && supabase) {
-        try {
+        let insertedId = `scl-${Date.now()}`;
+        if (isSupabaseConfigured && supabase) {
           const { data, error } = await supabase
             .from('schools')
             .insert(newSchoolData)
@@ -123,20 +123,21 @@ export const Schools: React.FC = () => {
           if (data) {
             insertedId = data.id;
           }
-        } catch (err: any) {
-          alert(err.message || "Failed to insert school into Supabase.");
-          return;
         }
+
+        const newSchool = mockDb.addRecord<School>('schools', {
+          id: insertedId,
+          ...newSchoolData
+        });
+
+        setSchools([...schools, newSchool]);
+        setShowAddForm(false);
+        clearForm();
       }
-
-      const newSchool = mockDb.addRecord<School>('schools', {
-        id: insertedId,
-        ...newSchoolData
-      });
-
-      setSchools([...schools, newSchool]);
-      setShowAddForm(false);
-      clearForm();
+    } catch (err: any) {
+      alert(err.message || "Failed to save school.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -158,21 +159,23 @@ export const Schools: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this school? This will cascade delete all students, admit cards, and scores associated with this school.")) return;
 
-    if (isSupabaseConfigured && supabase) {
-      try {
+    setDeletingId(id);
+    try {
+      if (isSupabaseConfigured && supabase) {
         const { error } = await supabase
           .from('schools')
           .delete()
           .eq('id', id);
         if (error) throw error;
-      } catch (err: any) {
-        alert(err.message || "Failed to delete school from Supabase.");
-        return;
       }
-    }
 
-    mockDb.deleteRecord('schools', id);
-    setSchools(schools.filter(s => s.id !== id));
+      mockDb.deleteRecord('schools', id);
+      setSchools(schools.filter(s => s.id !== id));
+    } catch (err: any) {
+      alert(err.message || "Failed to delete school.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const filteredSchools = schools.filter(
@@ -341,20 +344,23 @@ export const Schools: React.FC = () => {
           <div className="flex justify-end space-x-3 pt-3">
             <button
               type="button"
+              disabled={isSaving}
               onClick={() => {
                 setEditingSchool(null);
                 clearForm();
                 setShowAddForm(false);
               }}
-              className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-sm px-5 py-2 rounded-xl"
+              className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-sm px-5 py-2 rounded-xl disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="text-white bg-blue-600 hover:bg-blue-500 text-sm px-5 py-2 rounded-xl shadow"
+              disabled={isSaving}
+              className="text-white bg-blue-600 hover:bg-blue-500 text-sm px-5 py-2.5 rounded-xl shadow flex items-center font-semibold disabled:opacity-50"
             >
-              {editingSchool ? 'Save Changes' : 'Register School'}
+              {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+              {editingSchool ? (isSaving ? 'Saving Changes...' : 'Save Changes') : (isSaving ? 'Registering...' : 'Register School')}
             </button>
           </div>
         </form>
@@ -423,17 +429,23 @@ export const Schools: React.FC = () => {
                     <div className="flex justify-end space-x-1.5">
                       <button
                         onClick={() => handleStartEdit(s)}
+                        disabled={isSaving || deletingId !== null}
                         title="Edit School"
-                        className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm"
+                        className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm disabled:opacity-50"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(s.id)}
+                        disabled={deletingId !== null}
                         title="Delete School"
-                        className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm"
+                        className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm disabled:opacity-50"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        {deletingId === s.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
                   </td>
