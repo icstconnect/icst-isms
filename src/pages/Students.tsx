@@ -43,6 +43,14 @@ export const Students: React.FC = () => {
   const [section, setSection] = useState('A');
   const [schoolRoll, setSchoolRoll] = useState('');
 
+  // Photo Upload & Cropper states
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [cropScale, setCropScale] = useState(1.0);
+  const [cropX, setCropX] = useState(0);
+  const [cropY, setCropY] = useState(0);
+
   const [filterQuery, setFilterQuery] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('');
 
@@ -123,6 +131,70 @@ export const Students: React.FC = () => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setTempImageSrc(reader.result as string);
+        setCropScale(1.0);
+        setCropX(0);
+        setCropY(0);
+        setShowCropper(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropSave = () => {
+    if (!tempImageSrc) return;
+
+    const img = new Image();
+    img.src = tempImageSrc;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 350;
+      canvas.height = 450;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const imgRatio = img.width / img.height;
+      const targetRatio = 175 / 225;
+      let baseW = 175;
+      let baseH = 225;
+      if (imgRatio > targetRatio) {
+        baseH = 225;
+        baseW = 225 * imgRatio;
+      } else {
+        baseW = 175;
+        baseH = 175 / imgRatio;
+      }
+
+      const dw = baseW * cropScale * 2;
+      const dh = baseH * cropScale * 2;
+      const dx = 175 + cropX * 2 - dw / 2;
+      const dy = 225 + cropY * 2 - dh / 2;
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, 350, 450);
+      ctx.drawImage(img, dx, dy, dw, dh);
+
+      let quality = 0.8;
+      let dataUrl = canvas.toDataURL('image/jpeg', quality);
+      let sizeKb = Math.round((dataUrl.split(',')[1].length * 3) / 4 / 1024);
+
+      // Auto decrease image size to be within 100KB max
+      while (sizeKb > 100 && quality > 0.1) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+        sizeKb = Math.round((dataUrl.split(',')[1].length * 3) / 4 / 1024);
+      }
+
+      setPhotoUrl(dataUrl);
+      setShowCropper(false);
+    };
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !dob || !selectedScl || isSaving) return;
@@ -142,7 +214,7 @@ export const Students: React.FC = () => {
       section,
       school_roll_no: schoolRoll,
       guardian_contact: guardianContact,
-      photo_url: null,
+      photo_url: photoUrl, // Pass cropped photo URL
       is_special_registration: false,
       form_number: fullFormNo,
       guardian_name: guardianName,
@@ -197,6 +269,7 @@ export const Students: React.FC = () => {
       setIsSameContact(false);
       setSection('A');
       setSchoolRoll('');
+      setPhotoUrl(null);
     } catch (err: any) {
       alert("Failed to register candidate: " + err.message);
     } finally {
@@ -254,65 +327,124 @@ export const Students: React.FC = () => {
             </div>
           </div>
 
-          {/* 1. Basic Details */}
+          {/* 1. Basic Details & Photo Upload */}
           <div className="space-y-4">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">1. Basic Details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Full Name <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  placeholder="Candidate Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Guardian Name <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  placeholder="Guardian Name"
-                  value={guardianName}
-                  onChange={(e) => setGuardianName(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Aadhaar No. <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  placeholder="12 digit number"
-                  maxLength={12}
-                  value={aadhaarNo}
-                  onChange={(e) => setAadhaarNo(e.target.value.replace(/\D/g, ''))}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg font-mono"
-                  required
-                />
-              </div>
-            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+              {/* Left Form Fields (Col span 2) */}
+              <div className="md:col-span-2 space-y-4 order-2 md:order-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Full Name <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="Candidate Name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Guardian Name <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="Guardian Name"
+                      value={guardianName}
+                      onChange={(e) => setGuardianName(e.target.value)}
+                      className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Date of Birth <span className="text-red-500">*</span></label>
-                <DatePicker
-                  value={dob}
-                  onChange={(val) => setDob(val)}
-                  required
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Aadhaar No. <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="12 digit number"
+                      maxLength={12}
+                      value={aadhaarNo}
+                      onChange={(e) => setAadhaarNo(e.target.value.replace(/\D/g, ''))}
+                      className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg font-mono focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Gender <span className="text-red-500">*</span></label>
+                    <select
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value as any)}
+                      className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Date of Birth <span className="text-red-500">*</span></label>
+                  <DatePicker
+                    value={dob}
+                    onChange={(val) => setDob(val)}
+                    required
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Gender <span className="text-red-500">*</span></label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value as any)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-white"
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
+
+              {/* Right Photo Upload Box (Col span 1) - Appears first on mobile flow for visual alignment */}
+              <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:bg-slate-100/50 transition-colors order-1 md:order-2">
+                <label className="text-xs font-bold text-slate-500 uppercase mb-3 text-center">Student Photograph</label>
+                
+                {/* 3.5cm x 4.5cm Passport aspect ratio preview: scaled 140px x 180px */}
+                <div className="w-[140px] h-[180px] border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm flex flex-col items-center justify-center relative group">
+                  {photoUrl ? (
+                    <>
+                      <img src={photoUrl} alt="Student passport preview" className="w-full h-full object-cover" />
+                      
+                      {/* Green Success Sign overlay */}
+                      <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1 shadow-md flex items-center justify-center">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center p-3">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-normal">
+                        Paste recent photo
+                      </span>
+                      <span className="text-[9px] text-slate-300 mt-1 uppercase font-bold">
+                        3.5 x 4.5 Ratio
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 flex flex-col items-center space-y-1.5 w-full">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="student-photo-file"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="student-photo-file"
+                    className="w-full text-center text-base sm:text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-4 py-3 sm:py-2 rounded-xl cursor-pointer transition-colors shadow-sm"
+                  >
+                    {photoUrl ? 'Change Image' : 'Upload Image'}
+                  </label>
+                  
+                  {photoUrl && (
+                    <span className="text-[10px] font-bold text-green-600 flex items-center bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200">
+                      ✓ Ready for admit card (Max 100KB)
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -330,7 +462,7 @@ export const Students: React.FC = () => {
                     maxLength={6}
                     value={pinCode}
                     onChange={(e) => handlePinCodeChange(e.target.value)}
-                    className="w-full border border-slate-200 p-2.5 pr-10 text-sm rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full border border-slate-200 p-2.5 pr-10 text-base sm:text-sm rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                     required
                   />
                   {isFetchingPincode && (
@@ -347,7 +479,7 @@ export const Students: React.FC = () => {
                   placeholder="Village"
                   value={village}
                   onChange={(e) => setVillage(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
                   required
                 />
               </div>
@@ -357,7 +489,7 @@ export const Students: React.FC = () => {
                   <select
                     value={postOffice}
                     onChange={(e) => setPostOffice(e.target.value)}
-                    className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-white"
+                    className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                     required
                   >
                     {postOfficeList.map((po) => (
@@ -370,7 +502,7 @@ export const Students: React.FC = () => {
                     placeholder="Enter PIN code to load or type Post Office"
                     value={postOffice}
                     onChange={(e) => setPostOffice(e.target.value)}
-                    className="w-full border border-slate-200 p-2.5 text-sm rounded-lg"
+                    className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
                     required
                   />
                 )}
@@ -385,7 +517,7 @@ export const Students: React.FC = () => {
                   placeholder="Police Station"
                   value={policeStation}
                   onChange={(e) => setPoliceStation(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
                   required
                 />
               </div>
@@ -396,7 +528,7 @@ export const Students: React.FC = () => {
                   placeholder="District (auto-fetched by PIN)"
                   value={district}
                   onChange={(e) => setDistrict(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg bg-slate-50 focus:outline-none"
                   required
                 />
               </div>
@@ -407,7 +539,7 @@ export const Students: React.FC = () => {
                   placeholder="State (auto-fetched by PIN)"
                   value={state}
                   onChange={(e) => setState(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-50"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg bg-slate-50 focus:outline-none"
                   required
                 />
               </div>
@@ -426,7 +558,7 @@ export const Students: React.FC = () => {
                   placeholder="10 digits"
                   value={guardianContact}
                   onChange={(e) => setGuardianContact(e.target.value.replace(/\D/g, ''))}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg font-mono"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -439,11 +571,11 @@ export const Students: React.FC = () => {
                   value={whatsappNo}
                   onChange={(e) => setWhatsappNo(e.target.value.replace(/\D/g, ''))}
                   disabled={isSameContact}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg font-mono disabled:bg-slate-100 disabled:opacity-75"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg font-mono disabled:bg-slate-100 disabled:opacity-75 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 
                 {/* Same contact checkbox */}
-                <div className="flex items-center space-x-2 mt-2">
+                <div className="flex items-center space-x-2.5 mt-3.5">
                   <input
                     type="checkbox"
                     id="same-contact"
@@ -454,7 +586,7 @@ export const Students: React.FC = () => {
                         setWhatsappNo(guardianContact);
                       }
                     }}
-                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <label htmlFor="same-contact" className="text-xs font-semibold text-slate-500 cursor-pointer select-none">
                     WhatsApp number is same as contact number
@@ -466,9 +598,9 @@ export const Students: React.FC = () => {
 
           {/* 4. Educational Details */}
           <div className="space-y-4 pt-2">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">4. Educational Details</h4>
-              <span className="text-xs font-bold text-slate-400">Academic Session: 2026 - 2027</span>
+              <span className="text-[11px] font-bold text-slate-400">Academic Session: 2026 - 2027</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -476,7 +608,7 @@ export const Students: React.FC = () => {
                 <select
                   value={selectedSch}
                   onChange={(e) => setSelectedSch(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-white"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   {dbScholarships.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
@@ -488,7 +620,7 @@ export const Students: React.FC = () => {
                 <select
                   value={selectedScl}
                   onChange={(e) => setSelectedScl(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-white"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                   required
                 >
                   <option value="">-- Select School --</option>
@@ -499,14 +631,14 @@ export const Students: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Class</label>
                 <input
                   type="text"
                   value="X"
                   disabled
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg bg-slate-100 text-slate-600 font-extrabold text-center"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg bg-slate-100 text-slate-600 font-extrabold text-center focus:outline-none"
                 />
               </div>
               <div>
@@ -516,7 +648,7 @@ export const Students: React.FC = () => {
                   placeholder="Section (e.g. A, B)"
                   value={section}
                   onChange={(e) => setSection(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg text-center font-bold"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg text-center font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -527,14 +659,14 @@ export const Students: React.FC = () => {
                   placeholder="School Roll"
                   value={schoolRoll}
                   onChange={(e) => setSchoolRoll(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 text-sm rounded-lg text-center font-bold"
+                  className="w-full border border-slate-200 p-2.5 text-base sm:text-sm rounded-lg text-center font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
                   required
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sm:space-x-3 pt-3 border-t border-slate-100">
             <button
               type="button"
               disabled={isSaving}
@@ -542,14 +674,14 @@ export const Students: React.FC = () => {
                 setShowAddForm(false);
                 setFormNoSuffix('');
               }}
-              className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-sm px-5 py-2 rounded-xl disabled:opacity-50"
+              className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-base sm:text-sm py-3 sm:py-2 px-5 rounded-xl disabled:opacity-50 font-semibold w-full sm:w-auto"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="text-white bg-blue-600 hover:bg-blue-500 text-sm px-5 py-2.5 rounded-xl shadow font-semibold flex items-center disabled:opacity-50"
+              className="text-white bg-blue-600 hover:bg-blue-500 text-base sm:text-sm py-3 sm:py-2.5 px-5 rounded-xl shadow font-semibold flex items-center justify-center disabled:opacity-50 w-full sm:w-auto"
             >
               {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               {isSaving ? 'Enrolling...' : 'Enroll Candidate'}
@@ -590,78 +722,272 @@ export const Students: React.FC = () => {
         </div>
 
         {filteredStudents.length > 0 ? (
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 font-semibold text-slate-600">ID / Form No.</th>
-                <th className="p-4 font-semibold text-slate-600">Student Name</th>
-                <th className="p-4 font-semibold text-slate-600">School</th>
-                <th className="p-4 font-semibold text-slate-600">DOB / Gender</th>
-                <th className="p-4 font-semibold text-slate-600">Class & Roll</th>
-                <th className="p-4 font-semibold text-slate-600">Guardian Contact</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+          <>
+            <table className="w-full text-left border-collapse text-sm hidden md:table">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="p-4 font-semibold text-slate-600">ID / Form No.</th>
+                  <th className="p-4 font-semibold text-slate-600">Student Name</th>
+                  <th className="p-4 font-semibold text-slate-600">School</th>
+                  <th className="p-4 font-semibold text-slate-600">DOB / Gender</th>
+                  <th className="p-4 font-semibold text-slate-600">Class & Roll</th>
+                  <th className="p-4 font-semibold text-slate-600">Guardian Contact</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredStudents.map(s => {
+                  const school = dbSchools.find(sch => sch.id === s.school_id);
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50/50">
+                      <td className="p-4">
+                        <div className="font-mono font-bold text-slate-500 text-xs">{s.student_id}</div>
+                        {s.form_number && (
+                          <div className="text-[10px] text-blue-600 font-extrabold mt-0.5 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/50 w-max">
+                            {s.form_number}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center space-x-3">
+                          {s.photo_url ? (
+                            <img src={s.photo_url} alt={s.name} className="w-8 h-8 rounded-full object-cover border border-slate-200" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 border">
+                              {s.name.charAt(0)}
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-bold text-slate-800">{s.name}</div>
+                            {s.guardian_name && (
+                              <div className="text-[10px] text-slate-400">Guardian: {s.guardian_name}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-700 font-medium">{school?.name || 'N/A'}</td>
+                      <td className="p-4">
+                        <div className="text-slate-700 font-semibold flex items-center text-xs">
+                          <Calendar className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                          {s.dob}
+                        </div>
+                        <div className="text-xs text-slate-400 capitalize">{s.gender}</div>
+                      </td>
+                      <td className="p-4 font-medium text-slate-600">
+                        <div>Class {s.class}</div>
+                        <div className="text-[11px] text-slate-400">Sec {s.section} | Roll #{s.school_roll_no}</div>
+                      </td>
+                      <td className="p-4 text-slate-500">
+                        <div className="flex items-center text-xs font-semibold">
+                          <Phone className="w-3.5 h-3.5 mr-1.5 text-slate-300" />
+                          {s.guardian_contact}
+                        </div>
+                        {s.whatsapp_no && (
+                          <div className="flex items-center text-[10px] text-slate-400 mt-1">
+                            <MessageSquare className="w-3.5 h-3.5 mr-1 text-slate-300" />
+                            WA: {s.whatsapp_no}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Mobile View responsive candidate cards */}
+            <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-slate-50/50">
               {filteredStudents.map(s => {
                 const school = dbSchools.find(sch => sch.id === s.school_id);
                 return (
-                  <tr key={s.id} className="hover:bg-slate-50/50">
-                    <td className="p-4">
-                      <div className="font-mono font-bold text-slate-500 text-xs">{s.student_id}</div>
-                      {s.form_number && (
-                        <div className="text-[10px] text-blue-600 font-extrabold mt-0.5 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/50 w-max">
-                          {s.form_number}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4">
+                  <div key={s.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col space-y-3">
+                    <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 border">
-                          {s.name.charAt(0)}
-                        </div>
+                        {s.photo_url ? (
+                          <img src={s.photo_url} alt={s.name} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 font-bold border border-blue-100 flex items-center justify-center">
+                            {s.name.charAt(0)}
+                          </div>
+                        )}
                         <div>
-                          <div className="font-bold text-slate-800">{s.name}</div>
-                          {s.guardian_name && (
-                            <div className="text-[10px] text-slate-400">Guardian: {s.guardian_name}</div>
-                          )}
+                          <h4 className="font-bold text-slate-800 text-sm">{s.name}</h4>
+                          <div className="flex items-center space-x-1.5 mt-0.5">
+                            <span className="font-mono text-[10px] font-bold text-slate-400">{s.student_id}</span>
+                            {s.form_number && (
+                              <span className="text-[9px] text-blue-600 font-black bg-blue-50 px-1 py-0.2 rounded border border-blue-100/50">
+                                {s.form_number}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </td>
-                    <td className="p-4 text-slate-700 font-medium">{school?.name || 'N/A'}</td>
-                    <td className="p-4">
-                      <div className="text-slate-700 font-semibold flex items-center text-xs">
-                        <Calendar className="w-3.5 h-3.5 mr-1 text-slate-400" />
-                        {s.dob}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-2.5 text-slate-600">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">School</span>
+                        <span className="font-semibold text-slate-700 truncate block">{school?.name || 'N/A'}</span>
                       </div>
-                      <div className="text-xs text-slate-400 capitalize">{s.gender}</div>
-                    </td>
-                    <td className="p-4 font-medium text-slate-600">
-                      <div>Class {s.class}</div>
-                      <div className="text-[11px] text-slate-400">Sec {s.section} | Roll #{s.school_roll_no}</div>
-                    </td>
-                    <td className="p-4 text-slate-500">
-                      <div className="flex items-center text-xs font-semibold">
-                        <Phone className="w-3.5 h-3.5 mr-1.5 text-slate-300" />
-                        {s.guardian_contact}
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">DOB / Gender</span>
+                        <span className="font-semibold text-slate-700 block">{s.dob} ({s.gender.charAt(0)})</span>
                       </div>
-                      {s.whatsapp_no && (
-                        <div className="flex items-center text-[10px] text-slate-400 mt-1">
-                          <MessageSquare className="w-3 h-3 mr-1 text-slate-300" />
-                          WA: {s.whatsapp_no}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Class & Roll</span>
+                        <span className="font-semibold text-slate-700 block">X | Sec {s.section} | #{s.school_roll_no}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Guardian Name</span>
+                        <span className="font-semibold text-slate-700 block">{s.guardian_name || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+                      <span className="text-[10px] font-bold text-slate-400">Contact Details:</span>
+                      <div className="flex space-x-2">
+                        <a
+                          href={`tel:${s.guardian_contact}`}
+                          className="flex items-center text-xs font-bold text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
+                        >
+                          <Phone className="w-3.5 h-3.5 mr-1" />
+                          Call
+                        </a>
+                        {s.whatsapp_no && (
+                          <a
+                            href={`https://wa.me/91${s.whatsapp_no}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center text-xs font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg border border-green-200 transition-colors"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                            WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         ) : (
           <div className="p-12 text-center text-slate-400">
             No registered students matching filter rules found.
           </div>
         )}
       </div>
+
+      {/* Photo Cropping Modal */}
+      {showCropper && tempImageSrc && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-sm w-full space-y-4">
+            <h3 className="text-base font-bold text-slate-800 border-b pb-2">Crop Student Photograph</h3>
+            
+            {/* Aspect Ratio Box Mask: 3.5 to 4.5 */}
+            <div className="flex justify-center">
+              <div className="w-[175px] h-[225px] border-2 border-blue-500 rounded-lg overflow-hidden bg-slate-900 relative shadow-inner">
+                <img
+                  src={tempImageSrc}
+                  alt="Source to crop"
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: `translate(-50%, -50%) translate(${cropX}px, ${cropY}px) scale(${cropScale})`,
+                    transformOrigin: 'center center',
+                    maxWidth: 'none',
+                    maxHeight: 'none',
+                    minWidth: '100%',
+                    minHeight: '100%',
+                    display: 'block',
+                    pointerEvents: 'none'
+                  }}
+                />
+                
+                {/* Visual guidelines */}
+                <div className="absolute inset-0 border border-white/20 pointer-events-none"></div>
+                <div className="absolute top-1/3 left-0 right-0 border-b border-dashed border-white/20 pointer-events-none"></div>
+                <div className="absolute top-2/3 left-0 right-0 border-b border-dashed border-white/20 pointer-events-none"></div>
+                <div className="absolute left-1/3 top-0 bottom-0 border-r border-dashed border-white/20 pointer-events-none"></div>
+                <div className="absolute left-2/3 top-0 bottom-0 border-r border-dashed border-white/20 pointer-events-none"></div>
+              </div>
+            </div>
+
+            {/* Sliders */}
+            <div className="space-y-3.5 text-xs font-semibold text-slate-600">
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span>Zoom / Scale:</span>
+                  <span className="font-mono text-slate-500">{cropScale.toFixed(2)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.05"
+                  value={cropScale}
+                  onChange={(e) => setCropScale(parseFloat(e.target.value))}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span>Horizontal (Pan X):</span>
+                  <span className="font-mono text-slate-500">{cropX}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="-150"
+                  max="-150" // Wait, min="-150" max="150"
+                  className="hidden" // we will write direct ranges
+                />
+                <input
+                  type="range"
+                  min="-150"
+                  max="150"
+                  value={cropX}
+                  onChange={(e) => setCropX(parseInt(e.target.value))}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span>Vertical (Pan Y):</span>
+                  <span className="font-mono text-slate-500">{cropY}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="-150"
+                  max="150"
+                  value={cropY}
+                  onChange={(e) => setCropY(parseInt(e.target.value))}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Modal actions */}
+            <div className="flex justify-end space-x-3 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setShowCropper(false)}
+                className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-xs px-4 py-2 rounded-lg font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCropSave}
+                className="text-white bg-blue-600 hover:bg-blue-500 text-xs px-4 py-2 rounded-lg font-bold shadow-md"
+              >
+                Crop & Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

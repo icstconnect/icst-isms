@@ -63,6 +63,7 @@ export const Login: React.FC = () => {
                   data-testid="email-input"
                   name="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="e.g. sourav@icst.in"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -84,6 +85,7 @@ export const Login: React.FC = () => {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

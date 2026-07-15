@@ -17,10 +17,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   value,
   onChange,
   required = false,
-  placeholder = 'Select Date'
+  placeholder = 'DD-MM-YYYY'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [typedValue, setTypedValue] = useState('');
 
   // Parse initial date or default to today
   const today = new Date();
@@ -31,8 +32,48 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const [currentYear, setCurrentYear] = useState(initialYear);
   const [currentMonth, setCurrentMonth] = useState(initialMonth);
 
-  // Sync year and month if value changes
+  // Format YYYY-MM-DD date string to DD-MM-YYYY
+  const formattedValue = (dateVal: string) => {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  };
+
+  // Parse typed string of digits (e.g. 150726 or 15072026 or 15-07-2026) and return YYYY-MM-DD or null
+  const parseAndValidateDate = (input: string): string | null => {
+    const digits = input.replace(/\D/g, '');
+    
+    if (digits.length === 6) {
+      const dd = parseInt(digits.substring(0, 2));
+      const mm = parseInt(digits.substring(2, 4));
+      const yy = parseInt(digits.substring(4, 6));
+      // Standard year threshold: 40 or below -> 2000s, otherwise -> 1900s
+      const year = yy <= 40 ? 2000 + yy : 1900 + yy;
+      
+      const d = new Date(year, mm - 1, dd);
+      if (d.getFullYear() === year && d.getMonth() === mm - 1 && d.getDate() === dd) {
+        return `${year}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+      }
+    } else if (digits.length === 8) {
+      const dd = parseInt(digits.substring(0, 2));
+      const mm = parseInt(digits.substring(2, 4));
+      const yyyy = parseInt(digits.substring(4, 8));
+      
+      const d = new Date(yyyy, mm - 1, dd);
+      if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) {
+        return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+      }
+    }
+    return null;
+  };
+
+  // Sync year, month and typed value when parent value changes
   useEffect(() => {
+    setTypedValue(formattedValue(value));
     if (value) {
       const d = new Date(value);
       if (!isNaN(d.getTime())) {
@@ -56,11 +97,10 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const yearsRange = useMemo(() => {
     const current = new Date().getFullYear();
     const years = [];
-    // Dynamic DOB range from 1950 to current year + 5
     for (let y = current - 70; y <= current + 5; y++) {
       years.push(y);
     }
-    return years.sort((a, b) => b - a); // descending order
+    return years.sort((a, b) => b - a);
   }, []);
 
   const daysInMonth = useMemo(() => {
@@ -77,6 +117,34 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     const dateString = `${currentYear}-${monthStr}-${dayStr}`;
     onChange(dateString);
     setIsOpen(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setTypedValue(val);
+
+    const parsed = parseAndValidateDate(val);
+    if (parsed) {
+      onChange(parsed);
+    }
+  };
+
+  const handleBlur = () => {
+    const parsed = parseAndValidateDate(typedValue);
+    if (parsed) {
+      onChange(parsed);
+      setTypedValue(formattedValue(parsed));
+    } else {
+      // Revert to original valid value
+      setTypedValue(formattedValue(value));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+      setIsOpen(false);
+    }
   };
 
   const handlePrevMonth = () => {
@@ -97,17 +165,6 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     }
   };
 
-  const formattedValue = () => {
-    if (!value) return '';
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return '';
-    // Format: DD/MM/YYYY
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-  };
-
   const isSelected = (day: number) => {
     if (!value) return false;
     const d = new Date(value);
@@ -120,15 +177,26 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   };
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative font-sans" ref={containerRef}>
       <div 
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between border border-slate-200 p-2.5 text-sm rounded-lg bg-white cursor-pointer hover:border-slate-300 transition-colors focus-within:ring-1 focus-within:ring-blue-500 text-slate-700"
+        className="flex items-center justify-between border border-slate-200 rounded-lg bg-white hover:border-slate-300 transition-colors focus-within:ring-1 focus-within:ring-blue-500 overflow-hidden text-slate-700"
       >
-        <span className={value ? 'text-slate-800 font-medium' : 'text-slate-400'}>
-          {formattedValue() || placeholder}
-        </span>
-        <CalendarIcon className="w-4 h-4 text-slate-400" />
+        <input
+          type="text"
+          value={typedValue}
+          onChange={handleInputChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2.5 text-sm bg-transparent font-medium focus:outline-none text-slate-800"
+        />
+        <div 
+          onClick={() => setIsOpen(!isOpen)}
+          className="px-3 py-2.5 cursor-pointer border-l border-slate-100 hover:bg-slate-50 flex items-center justify-center"
+        >
+          <CalendarIcon className="w-4 h-4 text-slate-400" />
+        </div>
       </div>
 
       {isOpen && (

@@ -4,8 +4,8 @@ import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { BookOpen, Plus, BookCheck, ClipboardCopy, Pencil, Trash2, ChevronUp, ChevronDown, Layers, Loader2 } from 'lucide-react';
 
 export const Subjects: React.FC = () => {
-  const scholarships = mockDb.getData<Scholarship>('scholarships');
-  const [selectedSch, setSelectedSch] = useState(scholarships[0]?.id || '');
+  const [dbScholarships, setDbScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
+  const [selectedSch, setSelectedSch] = useState('');
   const [subjects, setSubjects] = useState<Subject[]>(mockDb.getData<Subject>('subjects'));
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -29,25 +29,36 @@ export const Subjects: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
 
-  // Fetch live subjects from Supabase on mount/scholarship change
+  // Fetch live subjects and scholarships from Supabase on mount
   useEffect(() => {
-    const fetchLiveSubjects = async () => {
+    const fetchLiveDetails = async () => {
       if (isSupabaseConfigured && supabase) {
         try {
-          const { data, error } = await supabase
-            .from('subjects')
-            .select('*')
-            .order('display_order', { ascending: true });
-          if (error) throw error;
-          if (data) {
-            setSubjects(data);
+          const [subRes, schRes] = await Promise.all([
+            supabase.from('subjects').select('*').order('display_order', { ascending: true }),
+            supabase.from('scholarships').select('*').order('created_at', { ascending: false })
+          ]);
+          
+          if (subRes.error) throw subRes.error;
+          if (schRes.error) throw schRes.error;
+
+          if (subRes.data) setSubjects(subRes.data);
+          if (schRes.data) {
+            setDbScholarships(schRes.data);
+            if (schRes.data.length > 0) {
+              setSelectedSch(schRes.data[0].id);
+            }
           }
         } catch (err) {
-          console.error("Error fetching subjects from Supabase:", err);
+          console.error("Error fetching live data from Supabase:", err);
+        }
+      } else {
+        if (dbScholarships.length > 0) {
+          setSelectedSch(dbScholarships[0].id);
         }
       }
     };
-    fetchLiveSubjects();
+    fetchLiveDetails();
   }, []);
 
   const activeSubjects = useMemo(() => {
@@ -358,7 +369,7 @@ export const Subjects: React.FC = () => {
             onChange={(e) => setSelectedSch(e.target.value)}
             className="flex-1 bg-transparent text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer"
           >
-            {scholarships.map(s => (
+            {dbScholarships.map(s => (
               <option key={s.id} value={s.id}>{s.name} ({s.academic_year})</option>
             ))}
           </select>

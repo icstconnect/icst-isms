@@ -247,10 +247,14 @@ export const SpecialReg: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col items-center space-y-2">
-                  {/* Mock Photo Box */}
-                  <div className="w-20 h-24 border border-slate-300 bg-slate-50 rounded flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">
-                    Photo Pending
-                  </div>
+                  {/* Photo Box */}
+                  {registeredCard.student.photo_url ? (
+                    <img src={registeredCard.student.photo_url} alt="Photo" className="w-20 h-24 object-cover border border-slate-300 rounded" />
+                  ) : (
+                    <div className="w-20 h-24 border border-slate-300 bg-slate-50 rounded flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">
+                      Photo Pending
+                    </div>
+                  )}
                   {/* Mock QR Code */}
                   <div className="w-12 h-12 bg-slate-100 rounded border flex items-center justify-center">
                     <QrCode className="w-8 h-8 text-slate-600" />

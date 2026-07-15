@@ -190,9 +190,13 @@ export const AdmitCards: React.FC = () => {
                   <div><strong>Date of Birth:</strong> {item.student.dob}</div>
                 </div>
 
-                <div className="w-20 h-24 border border-black bg-slate-50 flex items-center justify-center text-[10px] font-bold uppercase text-slate-400">
-                  Photo Space
-                </div>
+                {item.student.photo_url ? (
+                  <img src={item.student.photo_url} alt="Photo" className="w-20 h-24 object-cover border border-black" />
+                ) : (
+                  <div className="w-20 h-24 border border-black bg-slate-50 flex items-center justify-center text-[10px] font-bold uppercase text-slate-400">
+                    Photo Space
+                  </div>
+                )}
               </div>
 
               <div className="bg-slate-50 border border-black p-2 rounded text-xs space-y-0.5">
