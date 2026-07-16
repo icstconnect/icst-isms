@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Profile } from '../services/mockDb';
 import { 
   Users, 
@@ -16,6 +16,10 @@ import { useNavigate } from 'react-router-dom';
 
 export const CommitteeHonour: React.FC = () => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = 'Committee & Hierarchy | ICST ISMS';
+  }, []);
   const officials = mockDb.getData<Profile>('profiles').filter(p => p.status === 'Active');
   
   const [activeTab, setActiveTab] = useState<'list' | 'chart'>('list');

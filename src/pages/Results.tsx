@@ -16,6 +16,10 @@ export const Results: React.FC = () => {
   const [error, setError] = useState('');
   const [activeProfile, setActiveProfile] = useState<any>(null);
 
+  useEffect(() => {
+    document.title = 'Verification Portal | ICST ISMS';
+  }, []);
+
   // Fetch initial filters from Supabase if configured
   useEffect(() => {
     // Load active signature profile

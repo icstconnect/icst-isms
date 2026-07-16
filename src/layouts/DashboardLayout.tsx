@@ -91,6 +91,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     item => user && item.roles.includes(user.role)
   );
 
+  useEffect(() => {
+    const currentItem = sidebarItems.find(item => item.path === location.pathname);
+    if (currentItem) {
+      document.title = `${currentItem.name} | ICST ISMS`;
+    } else {
+      document.title = 'Dashboard | ICST ISMS';
+    }
+  }, [location.pathname]);
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
