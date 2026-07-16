@@ -3,6 +3,7 @@ import { mockDb, Scholarship } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { Award, Plus, Calendar, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { SkeletonCard } from '../components/Skeleton';
+import { DatePicker } from '../components/DatePicker';
 
 export const Scholarships: React.FC = () => {
   const [scholarships, setScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
@@ -14,6 +15,9 @@ export const Scholarships: React.FC = () => {
   const [name, setName] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
   const [description, setDescription] = useState('');
+  const [registrationEnd, setRegistrationEnd] = useState(
+    new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
 
   // Loading states
   const [isSaving, setIsSaving] = useState(false);
@@ -46,6 +50,7 @@ export const Scholarships: React.FC = () => {
     setName('');
     setDescription('');
     setYear(new Date().getFullYear());
+    setRegistrationEnd(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   };
 
   const handleAddOrEdit = async (e: React.FormEvent) => {
@@ -59,7 +64,8 @@ export const Scholarships: React.FC = () => {
         const updates = {
           name,
           academic_year: Number(year),
-          description
+          description,
+          registration_end: registrationEnd ? new Date(registrationEnd).toISOString() : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
         };
 
         if (isSupabaseConfigured && supabase) {
@@ -82,7 +88,7 @@ export const Scholarships: React.FC = () => {
           academic_year: Number(year),
           description,
           registration_start: new Date().toISOString(),
-          registration_end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+          registration_end: registrationEnd ? new Date(registrationEnd).toISOString() : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
           admit_card_publish_date: new Date(Date.now() + 100 * 24 * 60 * 60 * 1000).toISOString(),
           result_publish_date: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(),
           status: 'Draft' as const
@@ -121,6 +127,7 @@ export const Scholarships: React.FC = () => {
     setName(sch.name);
     setYear(sch.academic_year);
     setDescription(sch.description || '');
+    setRegistrationEnd(sch.registration_end ? new Date(sch.registration_end).toISOString().split('T')[0] : '');
     setShowAddForm(true);
   };
 
@@ -220,6 +227,10 @@ export const Scholarships: React.FC = () => {
                 required
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Registration End Date <span className="text-red-500">*</span></label>
+            <DatePicker value={registrationEnd} onChange={(val) => setRegistrationEnd(val)} required />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Description</label>
