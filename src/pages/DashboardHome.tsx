@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard, Mark, Attendance } from '../services/mockDb';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { SkeletonDashboard } from '../components/Skeleton';
 import { 
   School as SchoolIcon, 
@@ -23,21 +24,55 @@ import {
 
 export const DashboardHome: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  const [admitCards, setAdmitCards] = useState<AdmitCard[]>([]);
+  const [marks, setMarks] = useState<Mark[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 450);
-    return () => clearTimeout(timer);
-  }, []);
+    const loadDashboardData = async () => {
+      let localSchools = mockDb.getData<School>('schools');
+      let localStudents = mockDb.getData<Student>('students');
+      let localScholarships = mockDb.getData<Scholarship>('scholarships');
+      let localAdmitCards = mockDb.getData<AdmitCard>('admit_cards');
+      let localMarks = mockDb.getData<Mark>('marks');
+      let localAttendance = mockDb.getData<Attendance>('attendance');
 
-  // Fetch stats from mockDb
-  const schools = mockDb.getData<School>('schools');
-  const students = mockDb.getData<Student>('students');
-  const scholarships = mockDb.getData<Scholarship>('scholarships');
-  const admitCards = mockDb.getData<AdmitCard>('admit_cards');
-  const marks = mockDb.getData<Mark>('marks');
-  const attendance = mockDb.getData<Attendance>('attendance');
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const [scls, stus, schs, cards, mrks, atts] = await Promise.all([
+            supabase.from('schools').select('*'),
+            supabase.from('students').select('*'),
+            supabase.from('scholarships').select('*'),
+            supabase.from('admit_cards').select('*'),
+            supabase.from('marks').select('*'),
+            supabase.from('attendance').select('*')
+          ]);
+
+          if (scls.data) localSchools = scls.data;
+          if (stus.data) localStudents = stus.data;
+          if (schs.data) localScholarships = schs.data;
+          if (cards.data) localAdmitCards = cards.data;
+          if (mrks.data) localMarks = mrks.data;
+          if (atts.data) localAttendance = atts.data;
+        } catch (err) {
+          console.error("Error loading dashboard data from Supabase:", err);
+        }
+      }
+
+      setSchools(localSchools);
+      setStudents(localStudents);
+      setScholarships(localScholarships);
+      setAdmitCards(localAdmitCards);
+      setMarks(localMarks);
+      setAttendance(localAttendance);
+      setIsLoading(false);
+    };
+
+    loadDashboardData();
+  }, []);
 
   // Stats calculation
   const totalSchools = schools.length;

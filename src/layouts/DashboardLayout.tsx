@@ -108,7 +108,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-slate-900 text-slate-100 flex-shrink-0">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-slate-900 text-slate-100 flex-shrink-0 no-print">
         <div className="p-6 border-b border-slate-800 flex flex-col items-center">
           <img src="/logo.png" alt="ICST Logo" className="w-16 h-16 object-contain mb-2 rounded-xl bg-white/5 p-1" />
           <span className="font-semibold text-sm tracking-wider text-slate-300">ISMS DASHBOARD</span>
@@ -194,14 +194,18 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Navbar */}
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 z-10 flex-shrink-0">
-          <div className="flex items-center flex-1">
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 z-10 flex-shrink-0 no-print">
+          <div className="flex items-center space-x-3 flex-1">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden mr-4 text-slate-500 hover:text-slate-800"
+              className="lg:hidden text-slate-500 hover:text-slate-800"
             >
               <Menu className="w-6 h-6" />
             </button>
+            <div className="flex items-center space-x-2 mr-4">
+              <img src="/logo.png" alt="ICST Logo" className="w-8 h-8 object-contain rounded" />
+              <span className="font-extrabold text-sm text-slate-800 tracking-tight">ICST ISMS</span>
+            </div>
             
             {/* Global Search Input */}
             <div className="relative w-full max-w-md hidden md:block">

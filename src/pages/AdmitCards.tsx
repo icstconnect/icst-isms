@@ -597,7 +597,7 @@ export const AdmitCards: React.FC = () => {
                 {activeSignatureProfile?.institution_logo ? (
                   <img src={activeSignatureProfile.institution_logo} alt="School Logo" className="w-12 h-12 object-contain" />
                 ) : (
-                  <div className="w-10 h-10 bg-slate-100 border flex items-center justify-center font-bold text-xs uppercase">Logo</div>
+                  <img src="/logo.png" alt="ICST Logo" className="w-12 h-12 object-contain rounded" />
                 )}
                 <div>
                   <h4 className="font-extrabold text-sm uppercase tracking-wider">ICST Scholarship Examination</h4>
@@ -639,28 +639,12 @@ export const AdmitCards: React.FC = () => {
               {/* E4 Dynamic signatures and seals */}
               <div className="mt-8 flex justify-between items-end text-[9px] font-bold relative z-10">
                 <div className="text-center relative">
-                  {/* Dynamic Official Seal Overlay */}
-                  {activeSignatureProfile?.official_seal && (
-                    <img 
-                      src={activeSignatureProfile.official_seal} 
-                      alt="Seal" 
-                      className="w-12 h-12 object-contain absolute top-[-30px] left-4 opacity-75"
-                    />
-                  )}
                   <div className="w-24 border-b border-black h-4"></div>
                   <div className="mt-1">Invigilator Sign</div>
                 </div>
                 
                 <div className="text-center flex flex-col items-center">
-                  {activeSignatureProfile?.signature_image ? (
-                    <img 
-                      src={activeSignatureProfile.signature_image} 
-                      alt="Signature" 
-                      className="h-8 object-contain mb-1" 
-                    />
-                  ) : (
-                    <div className="h-6 italic font-normal text-slate-400">Authorized Signature</div>
-                  )}
+                  <div className="h-6 italic font-normal text-slate-400">Authorized Signature</div>
                   <div className="w-24 border-b border-black"></div>
                   <div className="mt-1 font-bold">{activeSignatureProfile?.name || 'Sourav Mukherjee'}</div>
                   <div className="text-[8px] text-slate-400 font-semibold">{activeSignatureProfile?.designation || 'Controller of Exam'}</div>
