@@ -35,9 +35,7 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         {/* Brand Logo */}
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center font-extrabold text-white text-3xl shadow-xl shadow-blue-500/20 mb-4 border border-blue-400/20">
-          ICST
-        </div>
+        <img src="/logo.png" alt="ICST Logo" className="mx-auto w-20 h-20 object-contain mb-4 rounded-2xl shadow-xl shadow-blue-500/10 border border-slate-800/40 p-1.5 bg-slate-900/40" />
         <h2 className="text-3xl font-extrabold text-white tracking-tight">
           ISMS Portal
         </h2>

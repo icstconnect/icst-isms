@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Profile, mockDb } from '../services/mockDb';
@@ -101,9 +101,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-slate-900 text-slate-100 flex-shrink-0">
         <div className="p-6 border-b border-slate-800 flex flex-col items-center">
-          <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white text-xl mb-2 shadow-lg shadow-blue-500/30">
-            ICST
-          </div>
+          <img src="/logo.png" alt="ICST Logo" className="w-16 h-16 object-contain mb-2 rounded-xl bg-white/5 p-1" />
           <span className="font-semibold text-sm tracking-wider text-slate-300">ISMS DASHBOARD</span>
         </div>
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
@@ -147,8 +145,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             >
               <X className="w-6 h-6" />
             </button>
-            <div className="mt-8 mb-6 border-b border-slate-800 pb-4 text-center">
-              <span className="font-semibold text-lg text-slate-300">ICST ISMS</span>
+            <div className="mt-8 mb-6 border-b border-slate-800 pb-4 flex flex-col items-center">
+              <img src="/logo.png" alt="ICST Logo" className="w-12 h-12 object-contain mb-2 rounded-lg bg-white/5 p-1" />
+              <span className="font-semibold text-sm tracking-wider text-slate-300">ICST ISMS</span>
             </div>
             <nav className="flex-1 space-y-1 overflow-y-auto">
               {filteredSidebarItems.map((item) => {
