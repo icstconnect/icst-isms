@@ -84,6 +84,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     { name: 'Marks Entry', path: '/dashboard/marks-entry', icon: <Database className="w-5 h-5" />, roles: ['SuperAdmin', 'Admin', 'ScholarshipCoordinator', 'MarksEvaluator'] },
     { name: 'Officials', path: '/dashboard/officials', icon: <Users className="w-5 h-5" />, roles: ['SuperAdmin', 'Admin'] },
     { name: 'Reports', path: '/dashboard/reports', icon: <FileSpreadsheet className="w-5 h-5" />, roles: ['SuperAdmin', 'Admin', 'ScholarshipCoordinator', 'Viewer'] },
+    { name: 'Security Config', path: '/dashboard/security', icon: <ShieldAlert className="w-5 h-5" />, roles: ['SuperAdmin', 'Admin'] },
   ];
 
   const filteredSidebarItems = sidebarItems.filter(

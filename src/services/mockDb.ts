@@ -14,6 +14,15 @@ export interface School {
   contact_number: string;
   email: string;
   created_at: string;
+  // B1 Workflow Additions
+  status?: 'Pending Review' | 'Approved' | 'Rejected' | 'Suspended';
+  rejection_reason?: string;
+  approval_history?: {
+    status: string;
+    timestamp: string;
+    action_by: string;
+    remarks?: string;
+  }[];
 }
 
 export interface Scholarship {
@@ -132,17 +141,155 @@ export interface Profile {
   photo_url: string | null;
   status: 'Active' | 'Suspended';
   email: string;
+  // B2 Coordinator Additions
+  school_id?: string;
+  permissions?: string[];
+  // H2 Committee Hierarchy
+  parent_id?: string;
+  department?: string;
+  historical_positions?: {
+    position: string;
+    start_date: string;
+    end_date: string;
+  }[];
+}
+
+// C3 Student Timeline Event
+export interface StudentTimelineEvent {
+  id: string;
+  student_id: string;
+  timestamp: string;
+  user_name: string;
+  action: string;
+  remarks?: string;
+}
+
+// C4 Student Transfer Request
+export interface StudentTransfer {
+  id: string;
+  student_id: string;
+  from_school_id: string;
+  to_school_id: string;
+  status: 'Pending Admin' | 'Pending Destination' | 'Completed' | 'Rejected';
+  requested_by: string;
+  approved_by?: string;
+  rejection_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// K2 Login History
+export interface LoginHistory {
+  id: string;
+  timestamp: string;
+  user_email: string;
+  ip_address: string;
+  device: string;
+  browser: string;
+  os: string;
+  location?: string;
+  status: 'Success' | 'Failed';
+  failed_reason?: string;
+}
+
+// K7 Security Alert
+export interface SecurityAlert {
+  id: string;
+  timestamp: string;
+  user_email: string;
+  event: string;
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+  status: 'Open' | 'Resolved';
+  remarks?: string;
+}
+
+// Generic Key-Value Settings store
+export interface SettingsConfig {
+  id: string;
+  value: any;
 }
 
 // Initial Mock Data
 const INITIAL_PROFILES: Profile[] = [
   { id: 'usr-1', name: 'Super Admin', role: 'SuperAdmin', contact_number: '9876543210', designation: 'General Secretary', joining_date: '2023-01-15', photo_url: null, status: 'Active', email: 'sourav@icst.in' },
-  { id: 'usr-2', name: 'Admin', role: 'Admin', contact_number: '9876543211', designation: 'Exam Coordinator', joining_date: '2024-03-10', photo_url: null, status: 'Active', email: 'ananya@icst.in' }
+  { id: 'usr-2', name: 'Admin', role: 'Admin', contact_number: '9876543211', designation: 'Exam Coordinator', joining_date: '2024-03-10', photo_url: null, status: 'Active', email: 'ananya@icst.in' },
+  {
+    id: 'usr-3',
+    name: 'School Coordinator',
+    role: 'ScholarshipCoordinator',
+    contact_number: '9876543212',
+    designation: 'Coordinator',
+    joining_date: '2024-05-10',
+    photo_url: null,
+    status: 'Active',
+    email: 'coordinator@icst.in',
+    school_id: 'scl-1',
+    permissions: [
+      'view_school',
+      'register_students',
+      'edit_students',
+      'download_admit_cards',
+      'view_schedules',
+      'view_results',
+      'download_reports'
+    ]
+  }
 ];
 
 const INITIAL_SCHOLARSHIPS: Scholarship[] = [];
 const INITIAL_SUBJECTS: Subject[] = [];
-const INITIAL_SCHOOLS: School[] = [];
+
+const INITIAL_SCHOOLS: School[] = [
+  {
+    id: 'scl-1',
+    school_id: 'SCH-0001',
+    name: 'ICST Model School',
+    udise: '19180100101',
+    type: 'Secondary',
+    address: '12, College Street, Kolkata',
+    district: 'Kolkata',
+    block: 'Kolkata-I',
+    pin: '700073',
+    headmaster_name: 'Dr. S. K. Roy',
+    contact_number: '9830012345',
+    email: 'contact@icstmodel.edu.in',
+    status: 'Approved',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'scl-2',
+    school_id: 'SCH-0002',
+    name: 'Kolkata High School',
+    udise: '19180100202',
+    type: 'HigherSecondary',
+    address: '45, Park Street, Kolkata',
+    district: 'Kolkata',
+    block: 'Kolkata-II',
+    pin: '700016',
+    headmaster_name: 'Mrs. A. Sen',
+    contact_number: '9830054321',
+    email: 'info@kolkatahigh.edu.in',
+    status: 'Pending Review',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'scl-3',
+    school_id: 'SCH-0003',
+    name: 'Salt Lake Public School',
+    udise: '19180100303',
+    type: 'Secondary',
+    address: 'Sector-II, Salt Lake, Kolkata',
+    district: 'North 24 Parganas',
+    block: 'Bidhannagar',
+    pin: '700091',
+    headmaster_name: 'Mr. R. N. Dutta',
+    contact_number: '9830098765',
+    email: 'slps@gmail.com',
+    status: 'Suspended',
+    created_at: new Date().toISOString()
+  }
+];
+
 const INITIAL_STUDENTS: Student[] = [];
 const INITIAL_ADMIT_CARDS: AdmitCard[] = [];
 const INITIAL_MARKS: Mark[] = [];
@@ -156,7 +303,23 @@ class MockDatabase {
   }
 
   private initLocalStorage() {
-    const keys = ['profiles', 'scholarships', 'subjects', 'schools', 'students', 'admit_cards', 'marks', 'attendance', 'audit_logs'];
+    const keys = [
+      'profiles',
+      'scholarships',
+      'subjects',
+      'schools',
+      'students',
+      'admit_cards',
+      'marks',
+      'attendance',
+      'audit_logs',
+      'student_timeline',
+      'student_transfers',
+      'settings_config',
+      'login_history',
+      'security_alerts'
+    ];
+
     const initialDataMap: Record<string, any> = {
       profiles: INITIAL_PROFILES,
       scholarships: INITIAL_SCHOLARSHIPS,
@@ -166,7 +329,58 @@ class MockDatabase {
       admit_cards: INITIAL_ADMIT_CARDS,
       marks: INITIAL_MARKS,
       attendance: INITIAL_ATTENDANCE,
-      audit_logs: INITIAL_AUDIT_LOGS
+      audit_logs: INITIAL_AUDIT_LOGS,
+      student_timeline: [],
+      student_transfers: [],
+      settings_config: [
+        {
+          id: 'duplicate_rules',
+          value: {
+            name_dob: true,
+            guardian_contact: true,
+            aadhaar: false,
+            school_roll: true,
+            student_id: true
+          }
+        },
+        {
+          id: 'watermark',
+          value: {
+            text: 'Official',
+            opacity: 0.1,
+            rotation: -30,
+            color: '#FF0000',
+            position: 'diagonal',
+            enabled: true
+          }
+        },
+        {
+          id: 'signature_profiles',
+          value: [
+            {
+              id: 'sig-default',
+              session_id: 'default',
+              name: 'Sourav Mukherjee',
+              designation: 'Controller of Exam',
+              signature_image: '',
+              official_seal: '',
+              institution_logo: '',
+              is_active: true
+            }
+          ]
+        },
+        {
+          id: 'storage_quota',
+          value: {
+            system_quota_mb: 500,
+            session_quota_mb: 100,
+            school_quota_mb: 20,
+            user_quota_mb: 5
+          }
+        }
+      ],
+      login_history: [],
+      security_alerts: []
     };
 
     keys.forEach(key => {
@@ -232,6 +446,37 @@ class MockDatabase {
     if (records.length === filtered.length) return false;
     this.setData(table, filtered);
     return true;
+  }
+
+  // Settings Configuration Helpers
+  getSetting(key: string, defaultValue: any): any {
+    const settings = this.getData<SettingsConfig>('settings_config');
+    const setting = settings.find(s => s.id === key);
+    return setting ? setting.value : defaultValue;
+  }
+
+  setSetting(key: string, value: any) {
+    const settings = this.getData<SettingsConfig>('settings_config');
+    const index = settings.findIndex(s => s.id === key);
+    if (index === -1) {
+      settings.push({ id: key, value });
+    } else {
+      settings[index].value = value;
+    }
+    this.setData('settings_config', settings);
+  }
+
+  // Student Timeline logging helper
+  addStudentEvent(studentId: string, action: string, remarks?: string, userName?: string) {
+    const event: StudentTimelineEvent = {
+      id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      student_id: studentId,
+      timestamp: new Date().toISOString(),
+      user_name: userName || 'System',
+      action,
+      remarks
+    };
+    this.addRecord<StudentTimelineEvent>('student_timeline', event);
   }
 }
 

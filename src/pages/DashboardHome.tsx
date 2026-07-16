@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard, Mark, Attendance } from '../services/mockDb';
+import { SkeletonDashboard } from '../components/Skeleton';
 import { 
   School as SchoolIcon, 
   Users, 
@@ -21,6 +22,15 @@ import {
 } from 'recharts';
 
 export const DashboardHome: React.FC = () => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Fetch stats from mockDb
   const schools = mockDb.getData<School>('schools');
   const students = mockDb.getData<Student>('students');
@@ -112,6 +122,18 @@ export const DashboardHome: React.FC = () => {
       };
     }).reverse().slice(0, 5); // Latest 5 activities
   }, [students]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm animate-pulse space-y-2">
+          <div className="h-6 bg-slate-200 rounded w-1/4" />
+          <div className="h-4 bg-slate-200 rounded w-1/2" />
+        </div>
+        <SkeletonDashboard />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

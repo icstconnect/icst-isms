@@ -2,11 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Subject, Scholarship } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { BookOpen, Plus, BookCheck, ClipboardCopy, Pencil, Trash2, ChevronUp, ChevronDown, Layers, Loader2 } from 'lucide-react';
+import { SkeletonTable } from '../components/Skeleton';
 
 export const Subjects: React.FC = () => {
   const [dbScholarships, setDbScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
   const [selectedSch, setSelectedSch] = useState('');
   const [subjects, setSubjects] = useState<Subject[]>(mockDb.getData<Subject>('subjects'));
+  const [isLoading, setIsLoading] = useState(true);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
@@ -57,6 +59,7 @@ export const Subjects: React.FC = () => {
           setSelectedSch(dbScholarships[0].id);
         }
       }
+      setIsLoading(false);
     };
     fetchLiveDetails();
   }, []);
@@ -571,7 +574,11 @@ export const Subjects: React.FC = () => {
 
       {/* Subjects list */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        {activeSubjects.length > 0 ? (
+        {isLoading ? (
+          <div className="p-6">
+            <SkeletonTable rows={4} cols={5} />
+          </div>
+        ) : activeSubjects.length > 0 ? (
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">

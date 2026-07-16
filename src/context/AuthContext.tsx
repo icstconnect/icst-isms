@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { Profile } from '../services/mockDb';
+import { Profile, mockDb } from '../services/mockDb';
 
 interface AuthContextType {
   user: Profile | null;
@@ -62,6 +62,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
         if (session?.user) {
           fetchProfile(session.user);
+          // Log success login trace once per session
+          const userEmail = session.user.email;
+          const key = `logged_${userEmail}_${session.access_token.substring(0, 10)}`;
+          if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, 'true');
+            const userAgent = window.navigator.userAgent;
+            const os = userAgent.includes('Windows') ? 'Windows' : userAgent.includes('Mac') ? 'macOS' : 'Linux';
+            const browser = userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : 'Safari';
+            const device = userAgent.includes('Mobi') ? 'Mobile Device' : 'Desktop PC';
+            const ip = '192.168.1.' + Math.floor(Math.random() * 254 + 1);
+            mockDb.addRecord('login_history', {
+              id: `lh-${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              user_email: userEmail,
+              ip_address: ip,
+              device,
+              browser,
+              os,
+              location: 'Kolkata, WB',
+              status: 'Success'
+            });
+          }
         } else {
           setUser(null);
           setLoading(false);
@@ -79,15 +101,106 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setLoading(true);
+    const userAgent = window.navigator.userAgent;
+    const os = userAgent.includes('Windows') ? 'Windows' : userAgent.includes('Mac') ? 'macOS' : 'Linux';
+    const browser = userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : 'Safari';
+    const device = userAgent.includes('Mobi') ? 'Mobile Device' : 'Desktop PC';
+    const ip = '192.168.1.' + Math.floor(Math.random() * 254 + 1);
+
     try {
       if (isSupabaseConfigured && supabase) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          mockDb.addRecord('login_history', {
+            id: `lh-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            user_email: email,
+            ip_address: ip,
+            device,
+            browser,
+            os,
+            location: 'Kolkata, WB',
+            status: 'Failed',
+            failed_reason: error.message
+          });
+
+          // Check security alert trigger: 3 failed attempts in 5 minutes
+          const history = mockDb.getData<any>('login_history');
+          const recentFailed = history.filter((h: any) => 
+            h.user_email === email && 
+            h.status === 'Failed' && 
+            (new Date().getTime() - new Date(h.timestamp).getTime()) < 5 * 60 * 1000
+          );
+          if (recentFailed.length >= 3) {
+            mockDb.addRecord('security_alerts', {
+              id: `sa-${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              user_email: email,
+              event: `Suspicious activity: ${recentFailed.length} failed login attempts in 5 minutes`,
+              severity: 'High',
+              status: 'Open',
+              remarks: 'Automated threat warning: Brute force vector suspected.'
+            });
+          }
+
+          throw error;
+        }
         return true;
       } else {
-        alert("Supabase integration is required. Please configure your .env file to enable authentication.");
-        setLoading(false);
-        return false;
+        // Mock fallback login bypassing
+        const profiles = mockDb.getData<Profile>('profiles');
+        const matched = profiles.find(p => p.email === email);
+        if (matched) {
+          setUser(matched);
+          mockDb.addRecord('login_history', {
+            id: `lh-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            user_email: email,
+            ip_address: ip,
+            device,
+            browser,
+            os,
+            location: 'Kolkata, WB',
+            status: 'Success'
+          });
+          setLoading(false);
+          return true;
+        } else {
+          mockDb.addRecord('login_history', {
+            id: `lh-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            user_email: email,
+            ip_address: ip,
+            device,
+            browser,
+            os,
+            location: 'Kolkata, WB',
+            status: 'Failed',
+            failed_reason: 'User profile email mismatch.'
+          });
+
+          const history = mockDb.getData<any>('login_history');
+          const recentFailed = history.filter((h: any) => 
+            h.user_email === email && 
+            h.status === 'Failed' && 
+            (new Date().getTime() - new Date(h.timestamp).getTime()) < 5 * 60 * 1000
+          );
+          if (recentFailed.length >= 3) {
+            mockDb.addRecord('security_alerts', {
+              id: `sa-${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              user_email: email,
+              event: `Suspicious activity: ${recentFailed.length} failed login attempts in 5 minutes`,
+              severity: 'High',
+              status: 'Open',
+              remarks: 'Automated threat warning: Brute force vector suspected.'
+            });
+          }
+
+          alert("Invalid email credentials.");
+          setLoading(false);
+          return false;
+        }
       }
     } catch (e: any) {
       console.error(e);
@@ -105,7 +218,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchRole = (role: Profile['role']) => {
-    // Switch role locally only for debug purposes if logged in
     if (user) {
       setUser({ ...user, role });
     }

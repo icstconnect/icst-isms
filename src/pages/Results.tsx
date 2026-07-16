@@ -14,9 +14,15 @@ export const Results: React.FC = () => {
   const [rollNumber, setRollNumber] = useState('');
   const [studentResult, setStudentResult] = useState<any | null>(null);
   const [error, setError] = useState('');
+  const [activeProfile, setActiveProfile] = useState<any>(null);
 
   // Fetch initial filters from Supabase if configured
   useEffect(() => {
+    // Load active signature profile
+    const sigProfiles = mockDb.getSetting('signature_profiles', []);
+    const active = sigProfiles.find((p: any) => p.is_active) || sigProfiles[0];
+    setActiveProfile(active);
+
     const fetchFilters = async () => {
       if (isSupabaseConfigured && supabase) {
         try {
@@ -467,16 +473,30 @@ export const Results: React.FC = () => {
             </div>
 
             {/* Seal / Footer Signature (Print view signature representation) */}
-            <div className="mt-12 flex justify-between items-end">
+            <div className="mt-12 flex justify-between items-end relative z-10">
               <div className="text-left text-xs text-slate-400">
                 <div>Document Hash: {Math.random().toString(36).substr(2, 9).toUpperCase()}</div>
                 <div>Generated: {new Date().toLocaleString()}</div>
               </div>
-              <div className="text-center">
-                <div className="w-36 h-12 border-b border-slate-400 flex items-center justify-center italic text-slate-400">
-                  Sourav Mukherjee
+              <div className="flex items-center space-x-6 relative">
+                {activeProfile?.official_seal && (
+                  <img 
+                    src={activeProfile.official_seal} 
+                    alt="Official Seal" 
+                    className="w-14 h-14 object-contain absolute left-[-50px] top-[-25px] opacity-75"
+                  />
+                )}
+                <div className="text-center">
+                  <div className="w-36 h-12 border-b border-slate-400 flex flex-col items-center justify-end pb-1 relative">
+                    {activeProfile?.signature_image ? (
+                      <img src={activeProfile.signature_image} alt="Signature" className="h-8 object-contain mb-0.5" />
+                    ) : (
+                      <span className="italic text-slate-400 text-xs">Sourav Mukherjee</span>
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-slate-800 mt-1">{activeProfile?.name || 'Sourav Mukherjee'}</div>
+                  <div className="text-[10px] text-slate-400 font-semibold uppercase">{activeProfile?.designation || 'General Secretary, ICST'}</div>
                 </div>
-                <div className="text-xs font-bold text-slate-500 mt-1 uppercase">General Secretary, ICST</div>
               </div>
             </div>
           </div>

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { mockDb, Scholarship } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { Award, Plus, Calendar, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { SkeletonCard } from '../components/Skeleton';
 
 export const Scholarships: React.FC = () => {
   const [scholarships, setScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
+  const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingScholarship, setEditingScholarship] = useState<Scholarship | null>(null);
 
@@ -35,6 +37,7 @@ export const Scholarships: React.FC = () => {
           console.error("Error fetching scholarships from Supabase:", err);
         }
       }
+      setIsLoading(false);
     };
     fetchLiveScholarships();
   }, []);
@@ -252,8 +255,15 @@ export const Scholarships: React.FC = () => {
         </form>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {scholarships.map(s => (
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <SkeletonCard key={idx} />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {scholarships.map(s => (
           <div key={s.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative group">
             
             {/* Action buttons on card hover */}
@@ -347,6 +357,8 @@ export const Scholarships: React.FC = () => {
           </div>
         ))}
       </div>
+      )
+    }
     </div>
   );
 };

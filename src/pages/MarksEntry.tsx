@@ -3,9 +3,11 @@ import { mockDb, Student, School, Scholarship, Subject, Mark, Attendance } from 
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Database, ShieldAlert, CheckCircle, Save, Lock, Unlock, Layers, Loader2 } from 'lucide-react';
+import { SkeletonTable } from '../components/Skeleton';
 
 export const MarksEntry: React.FC = () => {
   const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
   
   // Database states loaded from Supabase or mockDb
   const [dbScholarships, setDbScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
@@ -70,6 +72,7 @@ export const MarksEntry: React.FC = () => {
         if (dbScholarships.length > 0) setSelectedSch(dbScholarships[0].id);
         if (dbSchools.length > 0) setSelectedScl(dbSchools[0].id);
       }
+      setIsLoading(false);
     };
     fetchLiveDbData();
   }, []);
@@ -438,9 +441,12 @@ export const MarksEntry: React.FC = () => {
         </div>
       </div>
 
-      {/* Table grid */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        {studentRows.length > 0 ? (
+        {isLoading ? (
+          <div className="p-6">
+            <SkeletonTable rows={5} cols={6} />
+          </div>
+        ) : studentRows.length > 0 ? (
           <table className="w-full text-left border-collapse text-xs table-auto">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">

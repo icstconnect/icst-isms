@@ -15,6 +15,7 @@ import { MarksEntry } from './pages/MarksEntry';
 import { Officials } from './pages/Officials';
 import { Reports } from './pages/Reports';
 import { CommitteeHonour } from './pages/CommitteeHonour';
+import { Security } from './pages/Security';
 
 // Protected Route Guard
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -146,6 +147,16 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <Reports />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/security"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Security />
                 </DashboardLayout>
               </ProtectedRoute>
             }
