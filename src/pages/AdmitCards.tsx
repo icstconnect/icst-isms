@@ -12,7 +12,27 @@ import {
   CheckCircle, 
   X, 
   Sliders, 
-  Image as ImageIcon 
+  Image as ImageIcon,
+  Monitor,
+  Code,
+  Globe,
+  Palette,
+  Brain,
+  Bot,
+  Database,
+  Shield,
+  Cpu,
+  FileSpreadsheet,
+  Terminal,
+  Cloud,
+  Smartphone,
+  CheckCheck,
+  Award,
+  BookOpen,
+  GraduationCap,
+  CheckCircle2,
+  Zap,
+  Check
 } from 'lucide-react';
 import { SkeletonTable } from '../components/Skeleton';
 
@@ -582,10 +602,10 @@ export const AdmitCards: React.FC = () => {
       </div>
 
       {/* PRINT-ONLY AREA (A4 Bulk Printing, rendered 2 cards per page using page break CSS) */}
-      <div className="print-only">
-        {studentsWithCardStatus.filter(item => item.card).map((item, idx) => (
+      <div className="print-only font-sans text-black bg-white">
+        {studentsWithCardStatus.filter(item => item.card).map((item, idx, arr) => (
           <React.Fragment key={item.student.id}>
-            <div className="admit-card relative border-2 border-black p-4 mb-4 bg-white overflow-hidden min-h-[360px]">
+            <div className="admit-card relative bg-white text-black border-2 border-black p-2 flex flex-col justify-between">
               
               {/* E3: Background Watermark overlay */}
               {watermark.enabled && (
@@ -594,66 +614,260 @@ export const AdmitCards: React.FC = () => {
                 </div>
               )}
 
-              {/* Header section with Dynamic E4 Logo */}
-              <div className="text-center pb-2 border-b-2 border-black flex justify-between items-center relative z-10">
-                {activeSignatureProfile?.institution_logo ? (
-                  <img src={activeSignatureProfile.institution_logo} alt="School Logo" className="w-12 h-12 object-contain" />
-                ) : (
-                  <img src="/logo.png" alt="ICST Logo" className="w-12 h-12 object-contain rounded" />
-                )}
-                <div>
-                  <h4 className="font-extrabold text-sm uppercase tracking-wider">ICST Scholarship Examination</h4>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">ADMIT CARD</div>
-                </div>
-                <div className="w-10 h-10 border flex items-center justify-center relative z-10 bg-white">
-                  <QrCode className="w-8 h-8 text-black" />
-                </div>
-              </div>
-
-              {/* Student Details and passport photo */}
-              <div className="flex justify-between items-start my-4 relative z-10">
-                <div className="space-y-1.5 text-xs font-medium text-slate-800">
-                  <div><strong>Roll Number:</strong> <span className="font-bold font-mono text-sm">{item.card?.roll_number}</span></div>
-                  <div><strong>Candidate Name:</strong> <span className="font-bold">{item.student.name}</span></div>
-                  <div><strong>School:</strong> {item.school?.name}</div>
-                  <div><strong>Date of Birth:</strong> {item.student.dob}</div>
-                </div>
-
-                {item.student.photo_url ? (
-                  <img src={item.student.photo_url} alt="Photo" className="w-20 h-24 object-cover border border-black" />
-                ) : (
-                  <div className="w-20 h-24 border border-black bg-slate-50 flex items-center justify-center text-[10px] font-bold uppercase text-slate-400">
-                    Photo Space
+              {/* 1. Header Section */}
+              <div className="border-b-2 border-black pb-1 mb-1 flex justify-between items-center relative z-10">
+                <div className="flex items-center space-x-2">
+                  {activeSignatureProfile?.institution_logo ? (
+                    <img src={activeSignatureProfile.institution_logo} alt="Logo" className="w-11 h-11 object-contain grayscale" />
+                  ) : (
+                    <div className="w-11 h-11 border border-black flex items-center justify-center font-black text-xs text-center leading-tight">
+                      ICST
+                    </div>
+                  )}
+                  <div>
+                    <h2 className="font-black text-sm uppercase tracking-wide leading-none">ICST SCHOLARSHIP EXAMINATION</h2>
+                    <div className="text-[9px] font-bold uppercase tracking-wider mt-0.5 text-black">
+                      ADMIT CARD & SCHOLARSHIP CLAIM CERTIFICATE | SESSION {dbScholarships.find(s => s.id === selectedSch)?.academic_year || '2027-2028'}
+                    </div>
+                    <div className="text-[7.5px] font-semibold text-gray-800">
+                      Govt. Regd. Computer Educational Institution | ICST Chowberia, Nadia
+                    </div>
                   </div>
-                )}
-              </div>
-
-              {/* Exam Date & Venue metadata */}
-              <div className="bg-slate-50 border border-black p-2 rounded text-xs space-y-0.5 relative z-10 font-semibold text-slate-700">
-                <div><strong>Schedule:</strong> Date: {item.card?.exam_date} | Time: {item.card?.exam_time}</div>
-                <div><strong>Venue:</strong> {item.card?.venue}</div>
-              </div>
-
-              <div className="text-[9px] font-bold mt-2 border-t pt-1 relative z-10 text-slate-500">
-                Instructions: Bring Admit Card and School Identity card. Report at {item.card?.reporting_time || '30 min before schedule'}. BALLPOINT PEN ONLY.
-              </div>
-
-              {/* E4 Dynamic signatures and seals */}
-              <div className="mt-8 flex justify-between items-end text-[9px] font-bold relative z-10">
-                <div className="text-center relative">
-                  <div className="w-24 border-b border-black h-4"></div>
-                  <div className="mt-1">Invigilator Sign</div>
                 </div>
-                
-                <div className="text-center flex flex-col items-center">
-                  <div className="h-6 italic font-normal text-slate-400">Authorized Signature</div>
-                  <div className="w-24 border-b border-black"></div>
-                  <div className="mt-1 font-bold">{activeSignatureProfile?.name || 'Sourav Mukherjee'}</div>
-                  <div className="text-[8px] text-slate-400 font-semibold">{activeSignatureProfile?.designation || 'Controller of Exam'}</div>
+
+                <div className="flex items-center space-x-1.5 border-l border-black pl-2">
+                  <div className="text-center">
+                    <div className="w-10 h-10 border border-black flex items-center justify-center p-0.5 bg-white">
+                      <QrCode className="w-9 h-9 text-black" />
+                    </div>
+                    <div className="text-[6.5px] font-bold uppercase mt-0.5 leading-none">Scan to Verify</div>
+                  </div>
                 </div>
               </div>
+
+              {/* 2. Candidate & Examination Details Grid */}
+              <div className="grid grid-cols-[1fr_120px] gap-2 mb-1.5 relative z-10">
+                <div className="border border-black p-1.5 rounded text-[9.5px] leading-tight grid grid-cols-[85px_1fr_85px_1fr] gap-x-1 gap-y-0.5">
+                  <div className="font-bold">Roll Number:</div>
+                  <div className="font-black font-mono text-[11px]">{item.card?.roll_number}</div>
+                  <div className="font-bold">Reg. Number:</div>
+                  <div className="font-mono font-bold">{item.student.student_id}</div>
+
+                  <div className="font-bold">Student Name:</div>
+                  <div className="font-black uppercase col-span-3 text-[10.5px]">{item.student.name}</div>
+
+                  <div className="font-bold">Father's Name:</div>
+                  <div className="uppercase col-span-3">{item.student.father_name || 'N/A'}</div>
+
+                  <div className="font-bold">School Name:</div>
+                  <div className="font-bold col-span-3 truncate">{item.school?.name}</div>
+
+                  <div className="font-bold">Class:</div>
+                  <div className="font-bold">{item.student.class}</div>
+                  <div className="font-bold">Date of Birth:</div>
+                  <div>{item.student.dob}</div>
+
+                  <div className="col-span-4 border-t border-black/40 my-0.5 pt-0.5 grid grid-cols-2 gap-x-2 text-[9px]">
+                    <div><strong>Exam Date:</strong> {item.card?.exam_date} ({item.card?.exam_time})</div>
+                    <div><strong>Reporting:</strong> {item.card?.reporting_time}</div>
+                    <div className="col-span-2"><strong>Exam Venue:</strong> {item.card?.venue}</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center justify-between border border-black p-1 rounded bg-white">
+                  {item.student.photo_url ? (
+                    <img src={item.student.photo_url} alt="Candidate Photo" className="w-[70px] h-[85px] object-cover border border-black" />
+                  ) : (
+                    <div className="w-[70px] h-[85px] border border-black flex flex-col items-center justify-center text-[8px] font-bold text-gray-500 text-center leading-tight p-1">
+                      Passport Photo Space
+                    </div>
+                  )}
+                  <div className="w-full border-t border-black text-center pt-0.5 text-[7px] font-bold uppercase">
+                    Candidate Signature
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Corrected Scholarship Table (FIXED CLIPPING & Full Course Fee Text) */}
+              <div className="border border-black rounded mb-1.5 overflow-hidden relative z-10">
+                <div className="bg-black text-white text-[8.5px] font-bold px-2 py-0.5 uppercase tracking-wider text-center">
+                  স্কলারশিপের বিবরণ ও সুবিধাসমূহ (Scholarship Details & Eligibility)
+                </div>
+                <table className="w-full text-[8.5px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-black bg-gray-100 font-bold text-center">
+                      <th className="border-r border-black p-1 w-5/12">মেধা তালিকা / অর্জন</th>
+                      <th className="p-1 w-7/12 text-left pl-3">প্রাপ্ত স্কলারশিপের পরিমাণ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/30 font-medium">
+                    <tr>
+                      <td className="border-r border-black p-1 text-center font-bold">সমগ্র পরীক্ষায় প্রথম স্থান অধিকারী</td>
+                      <td className="p-1 pl-3 font-bold text-left">সম্পূর্ণ কোর্স ফিতে ১০০% স্কলারশিপ</td>
+                    </tr>
+                    <tr>
+                      <td className="border-r border-black p-1 text-center font-bold">প্রতিটি বিদ্যালয়ের প্রথম স্থান অধিকারী</td>
+                      <td className="p-1 pl-3 font-bold text-left">সম্পূর্ণ কোর্স ফিতে ৬০% স্কলারশিপ</td>
+                    </tr>
+                    <tr>
+                      <td className="border-r border-black p-1 text-center font-bold">প্রতিটি বিদ্যালয়ের দ্বিতীয় স্থান অধিকারী</td>
+                      <td className="p-1 pl-3 font-bold text-left">সম্পূর্ণ কোর্স ফিতে ৫০% স্কলারশিপ</td>
+                    </tr>
+                    <tr>
+                      <td className="border-r border-black p-1 text-center font-bold">প্রতিটি বিদ্যালয়ের তৃতীয় স্থান অধিকারী</td>
+                      <td className="p-1 pl-3 font-bold text-left">সম্পূর্ণ কোর্স ফিতে ৪০% স্কলারশিপ</td>
+                    </tr>
+                    <tr>
+                      <td className="border-r border-black p-1 text-center font-bold">পরীক্ষায় অংশগ্রহণকারী সকল শিক্ষার্থী</td>
+                      <td className="p-1 pl-3 font-bold text-left">ভর্তি ফিতে ৩০% ছাড়</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div className="bg-gray-100 border-t border-black text-[7.5px] font-bold p-1 text-center leading-tight">
+                  ★ উপরোক্ত সকল স্কলারশিপ শুধুমাত্র ২০২৭–২০২৮ শিক্ষাবর্ষে ICST Chowberia-এ পরিচালিত কম্পিউটার কোর্সে ভর্তির ক্ষেত্রে প্রযোজ্য।
+                </div>
+              </div>
+
+              {/* 4. 5-Step Visual Scholarship Claim Process */}
+              <div className="border border-black p-1 rounded mb-1.5 relative z-10 bg-white">
+                <div className="text-[8px] font-black uppercase tracking-wide mb-1 text-center border-b border-black/30 pb-0.5">
+                  স্কলারশিপ গ্রহণের সহজ ধাপসমূহ (Step-by-Step Scholarship Process)
+                </div>
+                <div className="flex items-center justify-between text-[7.5px] font-bold text-center px-1">
+                  <div className="border border-black px-1.5 py-0.5 rounded">① পরীক্ষা দিন</div>
+                  <div>➔</div>
+                  <div className="border border-black px-1.5 py-0.5 rounded">② ফলাফল প্রকাশ</div>
+                  <div>➔</div>
+                  <div className="border border-black px-1.5 py-0.5 rounded">③ স্কলারশিপ যাচাই</div>
+                  <div>➔</div>
+                  <div className="border border-black px-1.5 py-0.5 rounded">④ ICST-এ ভর্তি</div>
+                  <div>➔</div>
+                  <div className="border border-black px-1.5 py-0.5 rounded bg-black text-white">⑤ স্কলারশিপ প্রয়োগ</div>
+                </div>
+              </div>
+
+              {/* 5. ICST Computer Courses, Tools & Tech Showcase + Robotics Illustration */}
+              <div className="border border-black p-1 rounded mb-1.5 relative z-10 flex justify-between items-stretch gap-2">
+                <div className="flex-1">
+                  <div className="text-[8px] font-black uppercase tracking-wide mb-1 flex items-center">
+                    <Monitor className="w-3 h-3 mr-1 text-black" /> আমাদের পরিচালিত কম্পিউটার কোর্সসমূহ ও প্রযুক্তিসমূহ
+                  </div>
+                  
+                  {/* Course Tags */}
+                  <div className="flex flex-wrap gap-1 mb-1">
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Monitor className="w-2.5 h-2.5 mr-0.5" /> Basic
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Cpu className="w-2.5 h-2.5 mr-0.5" /> Advanced
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Code className="w-2.5 h-2.5 mr-0.5" /> Programming
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Globe className="w-2.5 h-2.5 mr-0.5" /> Web Dev
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Palette className="w-2.5 h-2.5 mr-0.5" /> Graphics
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Brain className="w-2.5 h-2.5 mr-0.5" /> AI Tech
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Bot className="w-2.5 h-2.5 mr-0.5" /> Robotics
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <FileSpreadsheet className="w-2.5 h-2.5 mr-0.5" /> Office Auto
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Cloud className="w-2.5 h-2.5 mr-0.5" /> Cloud & DB
+                    </span>
+                    <span className="inline-flex items-center border border-black text-[7px] font-bold px-1 rounded">
+                      <Shield className="w-2.5 h-2.5 mr-0.5" /> Cyber Security
+                    </span>
+                  </div>
+
+                  {/* Software & Tech Badges */}
+                  <div className="text-[6.5px] font-bold text-black border-t border-black/30 pt-0.5 flex flex-wrap gap-0.5">
+                    <span className="px-1 border border-black/40 rounded">C</span>
+                    <span className="px-1 border border-black/40 rounded">C++</span>
+                    <span className="px-1 border border-black/40 rounded">Python</span>
+                    <span className="px-1 border border-black/40 rounded">Java</span>
+                    <span className="px-1 border border-black/40 rounded">JS</span>
+                    <span className="px-1 border border-black/40 rounded">HTML5</span>
+                    <span className="px-1 border border-black/40 rounded">React</span>
+                    <span className="px-1 border border-black/40 rounded">SQL</span>
+                    <span className="px-1 border border-black/40 rounded">MS Word</span>
+                    <span className="px-1 border border-black/40 rounded">MS Excel</span>
+                    <span className="px-1 border border-black/40 rounded">PowerPoint</span>
+                    <span className="px-1 border border-black/40 rounded">Photoshop</span>
+                    <span className="px-1 border border-black/40 rounded">Illustrator</span>
+                    <span className="px-1 border border-black/40 rounded">VS Code</span>
+                    <span className="px-1 border border-black/40 rounded">Git</span>
+                  </div>
+                </div>
+
+                {/* Robotics Line-Art Illustration Vector */}
+                <div className="w-14 shrink-0 border-l border-black pl-1 flex flex-col items-center justify-center text-center">
+                  <svg className="w-10 h-10 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="10" rx="2" />
+                    <circle cx="12" cy="5" r="2" />
+                    <path d="M12 7v4" />
+                    <line x1="8" y1="15" x2="8" y2="15.01" strokeWidth="3" />
+                    <line x1="16" y1="15" x2="16" y2="15.01" strokeWidth="3" />
+                    <path d="M9 18h6" />
+                    <line x1="1" y1="16" x2="3" y2="16" />
+                    <line x1="21" y1="16" x2="23" y2="16" />
+                  </svg>
+                  <div className="text-[6.5px] font-black uppercase mt-0.5 leading-none">Robotics & AI</div>
+                </div>
+              </div>
+
+              {/* 6. Digital Signatures & Official Verification Footer */}
+              <div className="border-t-2 border-black pt-1 relative z-10">
+                <div className="flex justify-between items-end">
+                  <div className="border border-black px-1.5 py-0.5 rounded text-[8px] font-black uppercase flex items-center">
+                    <CheckCircle2 className="w-3 h-3 mr-1 text-black" /> ✓ Digitally Verified
+                  </div>
+
+                  <div className="text-center">
+                    <div className="w-20 border-b border-black h-4 mb-0.5"></div>
+                    <div className="text-[7.5px] font-bold uppercase">Invigilator Signature</div>
+                  </div>
+
+                  <div className="flex items-end space-x-2">
+                    {activeSignatureProfile?.official_seal && (
+                      <img src={activeSignatureProfile.official_seal} alt="Seal" className="w-9 h-9 object-contain grayscale" />
+                    )}
+                    <div className="text-center">
+                      {activeSignatureProfile?.signature_image ? (
+                        <img src={activeSignatureProfile.signature_image} alt="Signature" className="h-5 object-contain mb-0.5 grayscale" />
+                      ) : (
+                        <div className="h-5 italic text-[8px] text-gray-500">Controller Sign</div>
+                      )}
+                      <div className="w-24 border-b border-black"></div>
+                      <div className="text-[8px] font-black uppercase mt-0.5">{activeSignatureProfile?.name || 'Sourav Mukherjee'}</div>
+                      <div className="text-[6.5px] font-semibold text-gray-700">{activeSignatureProfile?.designation || 'Controller of Exam'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between text-[6.5px] font-mono border-t border-black/40 mt-1 pt-0.5">
+                  <div>Verification: isms.icstconnect.in/verify</div>
+                  <div>Doc ID: {item.card?.id.substring(0, 8) || 'N/A'} | Date: {new Date().toLocaleDateString('en-GB')}</div>
+                </div>
+              </div>
+
             </div>
             
+            {/* Cut guide if it's the first card on page and not the very last card in the array */}
+            {idx % 2 === 0 && idx + 1 < arr.length && (
+              <div className="cut-guide">
+                ✂ Cut Along This Line ✂
+              </div>
+            )}
+            
+            {/* Page break after every 2 cards */}
             {(idx + 1) % 2 === 0 && <div className="page-break" />}
           </React.Fragment>
         ))}
