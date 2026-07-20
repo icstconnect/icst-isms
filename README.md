@@ -203,7 +203,7 @@ The Admit Card generator (`src/pages/AdmitCards.tsx`) produces a high-density, 3
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                   ICST SCHOLARSHIP EXAM                  │ ◄── Top Card
-│  Roll: 261001   Name: AKASH SARKAR   [Photo]             │     (Height: 48% A4)
+│  Roll: 261001   Name: Student NAme   [Photo]             │     (Height: 48% A4)
 │  Exam Date: 2026-06-21               [QR Code]           │
 │  [Bengali Scholarship Table - Full Course Fee 100/60/50] │
 │  [Visual Flow: ① Exam ➔ ② Result ➔ ③ Verify ➔ ④ Enroll]  │
