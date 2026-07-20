@@ -104,6 +104,16 @@ function App() {
               }
             />
             <Route
+              path="/dashboard/special-reg"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <SpecialReg />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/dashboard/special-registration"
               element={
                 <ProtectedRoute>

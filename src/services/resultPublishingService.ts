@@ -17,6 +17,13 @@ export interface ValidationResult {
   totalAbsent: number;
 }
 
+export interface CalculatedSubjectScore {
+  subject_id: string;
+  subject_name: string;
+  full_marks: number;
+  score: number;
+}
+
 export interface CalculatedResultItem {
   student_id: string;
   roll_number: string;
@@ -27,6 +34,7 @@ export interface CalculatedResultItem {
   photo_url: string | null;
   is_absent: boolean;
   subject_scores: Record<string, number>; // subject_id -> score
+  subject_details?: CalculatedSubjectScore[];
   total_obtained: number;
   total_full: number;
   percentage: number;
@@ -294,17 +302,30 @@ export const publishSessionResults = async (
     }
 
     const subjectScores: Record<string, number> = {};
+    const subjectDetails: CalculatedSubjectScore[] = [];
     let totalObtained = 0;
     let passedAll = !isAbsent;
 
     subjects.forEach(sub => {
       if (isAbsent) {
         subjectScores[sub.id] = 0;
+        subjectDetails.push({
+          subject_id: sub.id,
+          subject_name: sub.name,
+          full_marks: sub.full_marks,
+          score: 0
+        });
       } else {
         const m = rawMarks.find((mk: any) => mk.student_id === st.id && mk.subject_id === sub.id);
         const rawScore = m ? (m.marks_obtained !== null && m.marks_obtained !== undefined ? m.marks_obtained : m.score) : 0;
         const scoreVal = parseFloat(rawScore) || 0;
         subjectScores[sub.id] = scoreVal;
+        subjectDetails.push({
+          subject_id: sub.id,
+          subject_name: sub.name,
+          full_marks: sub.full_marks,
+          score: scoreVal
+        });
         totalObtained += scoreVal;
         if (scoreVal < sub.pass_marks) passedAll = false;
       }
@@ -333,6 +354,7 @@ export const publishSessionResults = async (
       photo_url: st.photo_url,
       is_absent: isAbsent,
       subject_scores: subjectScores,
+      subject_details: subjectDetails,
       total_obtained: isAbsent ? 0 : totalObtained,
       total_full: totalFull,
       percentage: isAbsent ? 0 : percentage,
