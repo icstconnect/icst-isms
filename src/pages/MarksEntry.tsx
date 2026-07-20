@@ -174,20 +174,65 @@ export const MarksEntry: React.FC = () => {
   };
 
   const handleToggleAttendance = async (studentId: string, currentStatus: boolean) => {
-    const newStatus = currentStatus ? 'Present' : 'Absent';
-    
+    const newStatus: 'Present' | 'Absent' = currentStatus ? 'Present' : 'Absent';
     const existing = dbAttendance.find(a => a.student_id === studentId);
-    let updatedAttendance = [...dbAttendance];
     
+    // Save original state for reversion on failure
+    const originalAttendance = [...dbAttendance];
+    const originalScores = { ...localScores };
+    const originalComponentScores = { ...localComponentScores };
+    const originalDbMarks = [...dbMarks];
+
+    // Optimistically update React state immediately for snappy user experience
+    let updatedAttendance = [...dbAttendance];
+    let insertedId = existing?.id || `att-${Date.now()}`;
     const attData = {
       student_id: studentId,
       status: newStatus,
       recorded_by: user?.id || 'usr-1'
     };
 
-    let insertedId = `att-${Date.now()}`;
-    if (isSupabaseConfigured && supabase) {
-      try {
+    if (existing) {
+      const updatedObj: Attendance = { ...existing, status: newStatus };
+      updatedAttendance = dbAttendance.map(a => a.id === existing.id ? updatedObj : a);
+    } else {
+      const createdObj: Attendance = {
+        id: insertedId,
+        ...attData,
+        created_at: new Date().toISOString()
+      };
+      updatedAttendance.push(createdObj);
+    }
+
+    setDbAttendance(updatedAttendance);
+
+    // If marked absent, optimistically clear local scores in buffer
+    if (newStatus === 'Absent') {
+      const copy = { ...localScores };
+      Object.keys(copy).forEach(k => {
+        if (k.startsWith(`${studentId}_`)) {
+          delete copy[k];
+        }
+      });
+      setLocalScores(copy);
+
+      const copyComp = { ...localComponentScores };
+      delete copyComp[studentId];
+      setLocalComponentScores(copyComp);
+
+      const studentMarks = dbMarks.filter(m => m.student_id === studentId);
+      if (studentMarks.length > 0) {
+        let nextDbMarks = [...dbMarks];
+        studentMarks.forEach(markEntry => {
+          nextDbMarks = nextDbMarks.map(m => m.id === markEntry.id ? { ...m, marks_obtained: null, component_marks: undefined } : m);
+        });
+        setDbMarks(nextDbMarks);
+      }
+    }
+
+    // Now perform the database/local writes asynchronously
+    try {
+      if (isSupabaseConfigured && supabase) {
         if (existing) {
           const { error } = await supabase
             .from('attendance')
@@ -201,67 +246,46 @@ export const MarksEntry: React.FC = () => {
             .select()
             .single();
           if (error) throw error;
-          if (data) insertedId = data.id;
-        }
-      } catch (err: any) {
-        alert("Failed to save attendance in Supabase: " + err.message);
-        return;
-      }
-    }
-
-    if (existing) {
-      const updated = mockDb.updateRecord<Attendance>('attendance', existing.id, { status: newStatus });
-      if (updated) {
-        updatedAttendance = dbAttendance.map(a => a.id === existing.id ? updated : a);
-      }
-    } else {
-      const created = mockDb.addRecord<Attendance>('attendance', {
-        id: insertedId,
-        ...attData
-      });
-      updatedAttendance.push(created);
-    }
-
-    setDbAttendance(updatedAttendance);
-
-    // If marked absent, reset all marks for this student
-    if (newStatus === 'Absent') {
-      const copy = { ...localScores };
-      Object.keys(copy).forEach(k => {
-        if (k.startsWith(`${studentId}_`)) {
-          delete copy[k];
-        }
-      });
-      setLocalScores(copy);
-
-      const copyComp = { ...localComponentScores };
-      delete copyComp[studentId];
-      setLocalComponentScores(copyComp);
-      
-      const studentMarks = dbMarks.filter(m => m.student_id === studentId);
-      if (studentMarks.length > 0) {
-        if (isSupabaseConfigured && supabase) {
-          try {
-            const { error } = await supabase
-              .from('marks')
-              .update({ marks_obtained: null, component_marks: null })
-              .eq('student_id', studentId);
-            if (error) throw error;
-          } catch (err: any) {
-            alert("Failed to reset marks in Supabase: " + err.message);
-            return;
+          if (data && data.id) {
+            insertedId = data.id;
+            // Update the generated UUID from Supabase in the state
+            setDbAttendance(prev => prev.map(a => a.student_id === studentId ? { ...a, id: data.id } : a));
           }
         }
+      }
 
-        let nextDbMarks = [...dbMarks];
-        studentMarks.forEach(markEntry => {
-          const updatedMark = mockDb.updateRecord<Mark>('marks', markEntry.id, { marks_obtained: null, component_marks: undefined });
-          if (updatedMark) {
-            nextDbMarks = nextDbMarks.map(m => m.id === markEntry.id ? updatedMark : m);
-          }
+      // Sync with local mockDb
+      if (existing) {
+        mockDb.updateRecord<Attendance>('attendance', existing.id, { status: newStatus });
+      } else {
+        mockDb.addRecord<Attendance>('attendance', {
+          id: insertedId,
+          ...attData
         });
-        setDbMarks(nextDbMarks);
       }
+
+      // Sync mockDb marks reset if absent
+      if (newStatus === 'Absent') {
+        const studentMarks = dbMarks.filter(m => m.student_id === studentId);
+        studentMarks.forEach(markEntry => {
+          mockDb.updateRecord<Mark>('marks', markEntry.id, { marks_obtained: null, component_marks: undefined });
+        });
+        
+        if (isSupabaseConfigured && supabase && studentMarks.length > 0) {
+          const { error } = await supabase
+            .from('marks')
+            .update({ marks_obtained: null, component_marks: null })
+            .eq('student_id', studentId);
+          if (error) throw error;
+        }
+      }
+    } catch (err: any) {
+      // Revert to original state on failure
+      setDbAttendance(originalAttendance);
+      setLocalScores(originalScores);
+      setLocalComponentScores(originalComponentScores);
+      setDbMarks(originalDbMarks);
+      alert("Failed to save attendance: " + err.message);
     }
   };
 

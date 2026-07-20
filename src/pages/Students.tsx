@@ -10,6 +10,7 @@ import {
 } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import { ImageUpload } from '../components/ImageUpload';
 import { 
   UserSquare2, 
   Plus, 
@@ -79,13 +80,8 @@ export const Students: React.FC = () => {
   const [section, setSection] = useState('A');
   const [schoolRoll, setSchoolRoll] = useState('');
 
-  // Photo Upload & Cropper states
+  // Photo Upload state
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
-  const [showCropper, setShowCropper] = useState(false);
-  const [cropScale, setCropScale] = useState(1.0);
-  const [cropX, setCropX] = useState(0);
-  const [cropY, setCropY] = useState(0);
 
   const [filterQuery, setFilterQuery] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('');
@@ -179,6 +175,53 @@ export const Students: React.FC = () => {
     }
   }, [guardianContact, isSameContact]);
 
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const draftJson = localStorage.getItem('isms_student_registration_draft');
+      if (draftJson) {
+        const draft = JSON.parse(draftJson);
+        if (draft.name) setName(draft.name);
+        if (draft.dob) setDob(draft.dob);
+        if (draft.gender) setGender(draft.gender);
+        if (draft.guardianName) setGuardianName(draft.guardianName);
+        if (draft.aadhaarNo) setAadhaarNo(draft.aadhaarNo);
+        if (draft.village) setVillage(draft.village);
+        if (draft.postOffice) setPostOffice(draft.postOffice);
+        if (draft.policeStation) setPoliceStation(draft.policeStation);
+        if (draft.district) setDistrict(draft.district);
+        if (draft.state) setState(draft.state);
+        if (draft.pinCode) setPinCode(draft.pinCode);
+        if (draft.guardianContact) setGuardianContact(draft.guardianContact);
+        if (draft.whatsappNo) setWhatsappNo(draft.whatsappNo);
+        if (draft.isSameContact !== undefined) setIsSameContact(draft.isSameContact);
+        if (draft.selectedSch) setSelectedSch(draft.selectedSch);
+        if (draft.selectedScl) setSelectedScl(draft.selectedScl);
+        if (draft.section) setSection(draft.section);
+        if (draft.schoolRoll) setSchoolRoll(draft.schoolRoll);
+        if (draft.photoUrl) setPhotoUrl(draft.photoUrl);
+      }
+    } catch (e) {
+      console.error("Failed to load registration draft:", e);
+    }
+  }, []);
+
+  // Save draft on changes
+  useEffect(() => {
+    const draft = {
+      name, dob, gender, guardianName, aadhaarNo, village, postOffice, policeStation,
+      district, state, pinCode, guardianContact, whatsappNo, isSameContact,
+      selectedSch, selectedScl, section, schoolRoll, photoUrl
+    };
+    if (name || guardianName || pinCode || photoUrl) {
+      localStorage.setItem('isms_student_registration_draft', JSON.stringify(draft));
+    }
+  }, [
+    name, dob, gender, guardianName, aadhaarNo, village, postOffice, policeStation,
+    district, state, pinCode, guardianContact, whatsappNo, isSameContact,
+    selectedSch, selectedScl, section, schoolRoll, photoUrl
+  ]);
+
   // Handler for PIN code changes with API fetch
   const handlePinCodeChange = async (val: string) => {
     const sanitized = val.replace(/\D/g, '');
@@ -216,68 +259,7 @@ export const Students: React.FC = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setTempImageSrc(reader.result as string);
-        setCropScale(1.0);
-        setCropX(0);
-        setCropY(0);
-        setShowCropper(true);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
-  const handleCropSave = () => {
-    if (!tempImageSrc) return;
-
-    const img = new Image();
-    img.src = tempImageSrc;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 350;
-      canvas.height = 450;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const imgRatio = img.width / img.height;
-      const targetRatio = 175 / 225;
-      let baseW = 175;
-      let baseH = 225;
-      if (imgRatio > targetRatio) {
-        baseH = 225;
-        baseW = 225 * imgRatio;
-      } else {
-        baseW = 175;
-        baseH = 175 / imgRatio;
-      }
-
-      const dw = baseW * cropScale * 2;
-      const dh = baseH * cropScale * 2;
-      const dx = 175 + cropX * 2 - dw / 2;
-      const dy = 225 + cropY * 2 - dh / 2;
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, 350, 450);
-      ctx.drawImage(img, dx, dy, dw, dh);
-
-      let quality = 0.8;
-      let dataUrl = canvas.toDataURL('image/jpeg', quality);
-      let sizeKb = Math.round((dataUrl.split(',')[1].length * 3) / 4 / 1024);
-
-      while (sizeKb > 100 && quality > 0.1) {
-        quality -= 0.1;
-        dataUrl = canvas.toDataURL('image/jpeg', quality);
-        sizeKb = Math.round((dataUrl.split(',')[1].length * 3) / 4 / 1024);
-      }
-
-      setPhotoUrl(dataUrl);
-      setShowCropper(false);
-    };
-  };
 
   const clearForm = () => {
     setFormNoSuffix('');
@@ -299,6 +281,9 @@ export const Students: React.FC = () => {
     setSchoolRoll('');
     setPhotoUrl(null);
     setEditingStudent(null);
+    try {
+      localStorage.removeItem('isms_student_registration_draft');
+    } catch (e) {}
   };
 
   // Duplicate Check implementation
@@ -909,31 +894,12 @@ export const Students: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:bg-slate-100/50 transition-colors order-1 md:order-2">
-                <label className="text-xs font-bold text-slate-500 uppercase mb-3 text-center">Student Photograph</label>
-                <div className="w-[140px] h-[180px] border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm flex flex-col items-center justify-center relative group">
-                  {photoUrl ? (
-                    <>
-                      <img src={photoUrl} alt="Student passport preview" className="w-full h-full object-cover" />
-                      <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1 shadow-md flex items-center justify-center">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-center p-3">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-normal">Paste photo</span>
-                      <span className="text-[9px] text-slate-300 mt-1 uppercase font-bold">3.5 x 4.5 Ratio</span>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-4 flex flex-col items-center space-y-1.5 w-full">
-                  <input type="file" accept="image/*" id="student-photo-file" onChange={handleFileChange} className="hidden" />
-                  <label htmlFor="student-photo-file" className="w-full text-center text-base sm:text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-4 py-2.5 rounded-xl cursor-pointer transition-colors shadow-sm">
-                    {photoUrl ? 'Change Image' : 'Upload Image'}
-                  </label>
-                </div>
+              <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-200 order-1 md:order-2">
+                <ImageUpload 
+                  photoUrl={photoUrl} 
+                  onPhotoChange={setPhotoUrl} 
+                  label="Student Photograph" 
+                />
               </div>
             </div>
           </div>

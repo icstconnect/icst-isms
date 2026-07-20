@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { DatePicker } from '../components/DatePicker';
 import { SkeletonCard } from '../components/Skeleton';
+import { ImageUpload } from '../components/ImageUpload';
 
 export const Officials: React.FC = () => {
   const [officials, setOfficials] = useState<Profile[]>([]);
@@ -58,12 +59,7 @@ export const Officials: React.FC = () => {
     'edit_students'
   ]);
 
-  // Photograph Cropping States
-  const [showCropper, setShowCropper] = useState(false);
-  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
-  const [cropScale, setCropScale] = useState(1.0);
-  const [cropX, setCropX] = useState(0);
-  const [cropY, setCropY] = useState(0);
+  // Collapsed state map for the org tree
 
   // Collapsed state map for the org tree
   const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
@@ -105,69 +101,6 @@ export const Officials: React.FC = () => {
     });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setTempImageSrc(reader.result as string);
-        setCropScale(1.0);
-        setCropX(0);
-        setCropY(0);
-        setShowCropper(true);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleCropSave = () => {
-    if (!tempImageSrc) return;
-
-    const img = new Image();
-    img.src = tempImageSrc;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 350;
-      canvas.height = 450;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const imgRatio = img.width / img.height;
-      const targetRatio = 175 / 225;
-      let baseW = 175;
-      let baseH = 225;
-      if (imgRatio > targetRatio) {
-        baseH = 225;
-        baseW = 225 * imgRatio;
-      } else {
-        baseW = 175;
-        baseH = 175 / imgRatio;
-      }
-
-      const dw = baseW * cropScale * 2;
-      const dh = baseH * cropScale * 2;
-      const dx = 175 + cropX * 2 - dw / 2;
-      const dy = 225 + cropY * 2 - dh / 2;
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, 350, 450);
-      ctx.drawImage(img, dx, dy, dw, dh);
-
-      let quality = 0.8;
-      let dataUrl = canvas.toDataURL('image/jpeg', quality);
-      let sizeKb = Math.round((dataUrl.split(',')[1].length * 3) / 4 / 1024);
-
-      while (sizeKb > 100 && quality > 0.1) {
-        quality -= 0.1;
-        dataUrl = canvas.toDataURL('image/jpeg', quality);
-        sizeKb = Math.round((dataUrl.split(',')[1].length * 3) / 4 / 1024);
-      }
-
-      setPhotoUrl(dataUrl);
-      setShowCropper(false);
-    };
-  };
-
   const clearForm = () => {
     setName('');
     setEmail('');
@@ -177,8 +110,6 @@ export const Officials: React.FC = () => {
     setCustomUuid('');
     setPhotoUrl(null);
     setJoiningDate(new Date().toISOString().split('T')[0]);
-    setTempImageSrc(null);
-    setShowCropper(false);
     
     // Reset additions
     setParentId('');
@@ -475,26 +406,12 @@ export const Officials: React.FC = () => {
           )}
 
           {/* Photograph Upload */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
-            <div className="w-16 h-16 rounded-full bg-slate-200 overflow-hidden border border-slate-300 flex-shrink-0 flex items-center justify-center">
-              {photoUrl ? (
-                <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-center px-1">No Image</span>
-              )}
-            </div>
-            <div className="flex-1 w-full space-y-1">
-              <label className="block text-xs font-bold text-slate-500 uppercase">
-                Official Photograph <span className="text-red-500">*</span>
-              </label>
-              <p className="text-[10px] text-slate-400">Upload a recent photo (Passport layout, JPEG format, max 200KB).</p>
-              <div className="flex items-center space-x-2 pt-1">
-                <input type="file" accept="image/*" id="official-photo-file" onChange={handleFileChange} className="hidden" />
-                <label htmlFor="official-photo-file" className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer shadow transition-colors">
-                  {photoUrl ? 'Change Photo' : 'Upload Photo'}
-                </label>
-              </div>
-            </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <ImageUpload 
+              photoUrl={photoUrl} 
+              onPhotoChange={setPhotoUrl} 
+              label="Official Photograph" 
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -883,58 +800,7 @@ export const Officials: React.FC = () => {
         )
       )}
 
-      {/* Photo Cropping Modal */}
-      {showCropper && tempImageSrc && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-sm w-full space-y-4">
-            <h3 className="text-base font-bold text-slate-800 border-b pb-2">Crop Official Photograph</h3>
-            <div className="flex justify-center">
-              <div className="w-[175px] h-[225px] border-2 border-blue-500 rounded-lg overflow-hidden bg-slate-900 relative shadow-inner">
-                <img
-                  src={tempImageSrc}
-                  alt="Source to crop"
-                  style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: `translate(-50%, -50%) translate(${cropX}px, ${cropY}px) scale(${cropScale})`,
-                    transformOrigin: 'center center',
-                    maxWidth: 'none',
-                    maxHeight: 'none',
-                    minWidth: '100%',
-                    minHeight: '100%',
-                    display: 'block',
-                    pointerEvents: 'none'
-                  }}
-                />
-              </div>
-            </div>
-            <div className="space-y-3.5 text-xs font-semibold text-slate-600">
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span>Zoom / Scale:</span>
-                  <span className="font-mono text-slate-500">{cropScale.toFixed(2)}x</span>
-                </div>
-                <input type="range" min="1" max="3" step="0.05" value={cropScale} onChange={(e) => setCropScale(parseFloat(e.target.value))} className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span>Pan X ({cropX}px)</span>
-                  <input type="range" min="-150" max="150" value={cropX} onChange={(e) => setCropX(parseInt(e.target.value))} className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
-                </div>
-                <div>
-                  <span>Pan Y ({cropY}px)</span>
-                  <input type="range" min="-150" max="150" value={cropY} onChange={(e) => setCropY(parseInt(e.target.value))} className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3 pt-3 border-t">
-              <button type="button" onClick={() => setShowCropper(false)} className="text-slate-500 bg-slate-100 hover:bg-slate-200 text-xs px-4 py-2 rounded-lg font-semibold">Cancel</button>
-              <button type="button" onClick={handleCropSave} className="text-white bg-blue-600 hover:bg-blue-500 text-xs px-4 py-2 rounded-lg font-bold shadow-md">Crop & Save</button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
