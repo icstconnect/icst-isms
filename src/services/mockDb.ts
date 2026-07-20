@@ -402,6 +402,12 @@ class MockDatabase {
 
   // Specific helpers
   addRecord<T extends { id: string }>(table: string, record: any): T {
+    if (table === 'marks' || table === 'attendance') {
+      const lockSetting = this.getSetting('marks_editing_lock', { locked: false });
+      if (lockSetting && lockSetting.locked === true) {
+        throw new Error("HTTP 403 Forbidden: Marks entry is currently locked.");
+      }
+    }
     const records = this.getData<T>(table);
     const newRecord = {
       ...record,
@@ -414,6 +420,12 @@ class MockDatabase {
   }
 
   updateRecord<T extends { id: string }>(table: string, id: string, updates: Partial<T>): T | null {
+    if (table === 'marks' || table === 'attendance') {
+      const lockSetting = this.getSetting('marks_editing_lock', { locked: false });
+      if (lockSetting && lockSetting.locked === true) {
+        throw new Error("HTTP 403 Forbidden: Marks entry is currently locked.");
+      }
+    }
     const records = this.getData<T>(table);
     const index = records.findIndex(r => r.id === id);
     if (index === -1) return null;
@@ -441,6 +453,12 @@ class MockDatabase {
   }
 
   deleteRecord<T extends { id: string }>(table: string, id: string): boolean {
+    if (table === 'marks' || table === 'attendance') {
+      const lockSetting = this.getSetting('marks_editing_lock', { locked: false });
+      if (lockSetting && lockSetting.locked === true) {
+        throw new Error("HTTP 403 Forbidden: Marks entry is currently locked.");
+      }
+    }
     const records = this.getData<T>(table);
     const filtered = records.filter(r => r.id !== id);
     if (records.length === filtered.length) return false;

@@ -176,8 +176,8 @@ export const Scholarships: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 font-sans">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center">
             <Award className="w-6 h-6 mr-2 text-blue-600" />
@@ -193,7 +193,7 @@ export const Scholarships: React.FC = () => {
             }
             setShowAddForm(!showAddForm);
           }}
-          className="flex items-center text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl shadow-md cursor-pointer transition-all"
+          className="flex items-center text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl shadow-md cursor-pointer transition-colors self-end sm:self-auto"
         >
           <Plus className="w-5 h-5 mr-1" />
           {showAddForm ? 'Cancel' : 'Create Session'}

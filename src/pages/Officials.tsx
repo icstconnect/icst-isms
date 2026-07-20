@@ -334,7 +334,7 @@ export const Officials: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center">
             <Users className="w-6 h-6 mr-2 text-blue-600" />
@@ -342,7 +342,7 @@ export const Officials: React.FC = () => {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5 font-medium">Manage, check hierarchy structure, and register Scholarship Committee members.</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
           {/* Tab switcher */}
           <div className="bg-slate-100 p-0.5 border rounded-xl flex items-center shadow-inner">
             <button

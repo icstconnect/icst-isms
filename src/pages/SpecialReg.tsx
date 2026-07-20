@@ -526,9 +526,9 @@ export const SpecialReg: React.FC = () => {
           {/* Right Side Admit Card layout preview (Visible in print too) */}
           {registeredCard ? (
             <div className="space-y-4">
-              <div className="flex justify-between items-center no-print bg-slate-100 p-3 rounded-xl border border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 no-print bg-slate-100 p-3 rounded-xl border border-slate-200">
                 <span className="text-xs text-slate-500 font-semibold">Success! Admit Card Generated.</span>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 self-end sm:self-auto">
                   <button
                     onClick={handleResetForm}
                     className="flex items-center text-xs font-semibold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg cursor-pointer"

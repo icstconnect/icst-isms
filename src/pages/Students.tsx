@@ -682,7 +682,7 @@ export const Students: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center">
             <UserSquare2 className="w-6 h-6 mr-2 text-blue-600" />
@@ -691,7 +691,7 @@ export const Students: React.FC = () => {
           <p className="text-slate-500 text-sm mt-0.5 font-medium">Manage and enroll candidates matching the computer scholarship application forms.</p>
         </div>
         
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 self-end sm:self-auto">
           {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
             <button
               onClick={() => setShowRulesConfig(true)}
@@ -1114,8 +1114,8 @@ export const Students: React.FC = () => {
       {/* Filter panel */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
-          <div className="flex flex-1 gap-4">
-            <div className="relative w-full max-w-xs">
+          <div className="flex flex-col sm:flex-row flex-1 gap-3 w-full">
+            <div className="relative w-full sm:max-w-xs">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="w-4 h-4 text-slate-400" />
               </div>
@@ -1132,7 +1132,7 @@ export const Students: React.FC = () => {
               <select
                 value={schoolFilter}
                 onChange={(e) => setSchoolFilter(e.target.value)}
-                className="border border-slate-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:outline-none"
+                className="border border-slate-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:outline-none w-full sm:w-auto"
               >
                 <option value="">All Schools</option>
                 {dbSchools.map(s => (
@@ -1141,7 +1141,7 @@ export const Students: React.FC = () => {
               </select>
             )}
           </div>
-          <span className="text-xs font-semibold text-slate-400">Total Enrollment: {filteredStudents.length} candidates</span>
+          <span className="text-xs font-semibold text-slate-400 self-start md:self-auto">Total Enrollment: {filteredStudents.length} candidates</span>
         </div>
 
         {isLoading ? (
@@ -1149,116 +1149,217 @@ export const Students: React.FC = () => {
             <SkeletonTable rows={5} cols={7} />
           </div>
         ) : filteredStudents.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="p-4 font-semibold text-slate-600">ID / Form No.</th>
-                  <th className="p-4 font-semibold text-slate-600">Student Name</th>
-                  <th className="p-4 font-semibold text-slate-600">School</th>
-                  <th className="p-4 font-semibold text-slate-600">Class & Roll</th>
-                  <th className="p-4 font-semibold text-slate-600">Guardian Contact</th>
-                  <th className="p-4 font-semibold text-slate-600 text-center">Workflow</th>
-                  <th className="p-4 font-semibold text-slate-600 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredStudents.map(s => {
-                  const school = dbSchools.find(sch => sch.id === s.school_id);
-                  // Allow edit only if registration closes in future OR Admin role
-                  const activeSch = dbScholarships.find(sch => sch.id === s.scholarship_id);
-                  const isRegOpen = activeSch ? new Date(activeSch.registration_end) > new Date() : true;
-                  const canEdit = user?.role === 'SuperAdmin' || user?.role === 'Admin' || (user?.permissions?.includes('edit_students') && isRegOpen);
+          <div>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="p-4 font-semibold text-slate-600">ID / Form No.</th>
+                    <th className="p-4 font-semibold text-slate-600">Student Name</th>
+                    <th className="p-4 font-semibold text-slate-600">School</th>
+                    <th className="p-4 font-semibold text-slate-600">Class & Roll</th>
+                    <th className="p-4 font-semibold text-slate-600">Guardian Contact</th>
+                    <th className="p-4 font-semibold text-slate-600 text-center">Workflow</th>
+                    <th className="p-4 font-semibold text-slate-600 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredStudents.map(s => {
+                    const school = dbSchools.find(sch => sch.id === s.school_id);
+                    // Allow edit only if registration closes in future OR Admin role
+                    const activeSch = dbScholarships.find(sch => sch.id === s.scholarship_id);
+                    const isRegOpen = activeSch ? new Date(activeSch.registration_end) > new Date() : true;
+                    const canEdit = user?.role === 'SuperAdmin' || user?.role === 'Admin' || (user?.permissions?.includes('edit_students') && isRegOpen);
 
-                  return (
-                    <tr key={s.id} className="hover:bg-slate-50/50">
-                      <td className="p-4">
-                        <div className="font-mono font-bold text-slate-500 text-xs">{s.student_id}</div>
-                        {s.form_number && (
-                          <div className="text-[10px] text-blue-600 font-extrabold mt-0.5 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/50 w-max">
-                            {s.form_number}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center space-x-3">
-                          {s.photo_url ? (
-                            <img src={s.photo_url} alt={s.name} className="w-8 h-8 rounded-full object-cover border border-slate-200" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 border">
-                              {s.name.charAt(0)}
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-50/50">
+                        <td className="p-4">
+                          <div className="font-mono font-bold text-slate-500 text-xs">{s.student_id}</div>
+                          {s.form_number && (
+                            <div className="text-[10px] text-blue-600 font-extrabold mt-0.5 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/50 w-max">
+                              {s.form_number}
                             </div>
                           )}
-                          <div>
-                            <div className="font-bold text-slate-800">{s.name}</div>
-                            <div className="text-[10px] text-slate-400 capitalize">DOB: {s.dob} | {s.gender}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center space-x-3">
+                            {s.photo_url ? (
+                              <img src={s.photo_url} alt={s.name} className="w-8 h-8 rounded-full object-cover border border-slate-200" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 border">
+                                {s.name.charAt(0)}
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-bold text-slate-800">{s.name}</div>
+                              <div className="text-[10px] text-slate-400 capitalize">DOB: {s.dob} | {s.gender}</div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-slate-700 font-medium">{school?.name || 'N/A'}</td>
-                      <td className="p-4 font-medium text-slate-600">
-                        <div>Class {s.class}</div>
-                        <div className="text-[11px] text-slate-400">Sec {s.section} | Roll #{s.school_roll_no}</div>
-                      </td>
-                      <td className="p-4 text-slate-500 text-xs font-semibold">
-                        <div>{s.guardian_contact}</div>
-                        {s.whatsapp_no && <div className="text-slate-400 text-[10px] mt-0.5">WA: {s.whatsapp_no}</div>}
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center space-x-1.5">
-                          <button
-                            onClick={() => handleViewTimeline(s)}
-                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border text-[11px] font-bold text-slate-700 rounded-lg flex items-center"
-                            title="View student timeline"
-                          >
-                            <History className="w-3.5 h-3.5 mr-1 text-slate-500" /> Timeline
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedStudentForTransfer(s);
-                              setTransferDestinationSchoolId('');
-                              setShowTransferDialog(true);
-                            }}
-                            className="px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-[11px] font-bold text-blue-700 rounded-lg flex items-center"
-                            title="Request Transfer between schools"
-                          >
-                            <ArrowLeftRight className="w-3.5 h-3.5 mr-1" /> Transfer
-                          </button>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex justify-end space-x-1.5">
-                          {canEdit && (
+                        </td>
+                        <td className="p-4 text-slate-700 font-medium">{school?.name || 'N/A'}</td>
+                        <td className="p-4 font-medium text-slate-600">
+                          <div>Class {s.class}</div>
+                          <div className="text-[11px] text-slate-400">Sec {s.section} | Roll #{s.school_roll_no}</div>
+                        </td>
+                        <td className="p-4 text-slate-500 text-xs font-semibold">
+                          <div>{s.guardian_contact}</div>
+                          {s.whatsapp_no && <div className="text-slate-400 text-[10px] mt-0.5">WA: {s.whatsapp_no}</div>}
+                        </td>
+                        <td className="p-4 text-center">
+                          <div className="flex items-center justify-center space-x-1.5">
                             <button
-                              onClick={() => handleStartEdit(s)}
-                              disabled={isSaving || deletingId !== null}
-                              title="Edit Candidate Details"
-                              className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 border border-slate-200 cursor-pointer shadow-sm"
+                              onClick={() => handleViewTimeline(s)}
+                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border text-[11px] font-bold text-slate-700 rounded-lg flex items-center"
+                              title="View student timeline"
                             >
-                              <Pencil className="w-3.5 h-3.5" />
+                              <History className="w-3.5 h-3.5 mr-1 text-slate-500" /> Timeline
                             </button>
-                          )}
-                          {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
                             <button
-                              onClick={() => handleDelete(s.id)}
-                              disabled={deletingId !== null}
-                              title="Delete Candidate"
-                              className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 border border-red-100 cursor-pointer shadow-sm"
+                              onClick={() => {
+                                setSelectedStudentForTransfer(s);
+                                setTransferDestinationSchoolId('');
+                                setShowTransferDialog(true);
+                              }}
+                              className="px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-[11px] font-bold text-blue-700 rounded-lg flex items-center"
+                              title="Request Transfer between schools"
                             >
-                              {deletingId === s.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-3.5 h-3.5" />
-                              )}
+                              <ArrowLeftRight className="w-3.5 h-3.5 mr-1" /> Transfer
                             </button>
-                          )}
+                          </div>
+                        </td>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end space-x-1.5">
+                            {canEdit && (
+                              <button
+                                onClick={() => handleStartEdit(s)}
+                                disabled={isSaving || deletingId !== null}
+                                title="Edit Candidate Details"
+                                className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 border border-slate-200 cursor-pointer shadow-sm"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
+                              <button
+                                onClick={() => handleDelete(s.id)}
+                                disabled={deletingId !== null}
+                                title="Delete Candidate"
+                                className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 border border-red-100 cursor-pointer shadow-sm"
+                              >
+                                {deletingId === s.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card Stack View */}
+            <div className="block md:hidden p-4 space-y-4">
+              {filteredStudents.map(s => {
+                const school = dbSchools.find(sch => sch.id === s.school_id);
+                const activeSch = dbScholarships.find(sch => sch.id === s.scholarship_id);
+                const isRegOpen = activeSch ? new Date(activeSch.registration_end) > new Date() : true;
+                const canEdit = user?.role === 'SuperAdmin' || user?.role === 'Admin' || (user?.permissions?.includes('edit_students') && isRegOpen);
+
+                return (
+                  <div key={s.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                    <div className="flex items-center space-x-3">
+                      {s.photo_url ? (
+                        <img src={s.photo_url} alt={s.name} className="w-12 h-16 rounded-xl object-cover border border-slate-200" />
+                      ) : (
+                        <div className="w-12 h-16 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 border">
+                          {s.name.charAt(0)}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-extrabold text-slate-800 text-sm truncate">{s.name}</div>
+                        <div className="text-[11px] text-slate-500 font-mono font-semibold mt-0.5">ID: {s.student_id}</div>
+                        {s.form_number && (
+                          <div className="text-[9px] text-blue-600 font-extrabold mt-1 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100/50 w-max">
+                            Form: {s.form_number}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] border-t pt-2.5 text-slate-600">
+                      <div>
+                        <span className="font-bold text-[9px] text-slate-400 uppercase block">School</span>
+                        <span className="font-semibold text-slate-800 line-clamp-1">{school?.name || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-[9px] text-slate-400 uppercase block">Class & Roll</span>
+                        <span className="font-semibold text-slate-800">Class {s.class} ({s.section} | Roll {s.school_roll_no})</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-[9px] text-slate-400 uppercase block">Guardian Contact</span>
+                        <span className="font-mono font-semibold text-slate-800">{s.guardian_contact}</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-[9px] text-slate-400 uppercase block">Gender & DOB</span>
+                        <span className="font-semibold text-slate-800">{s.gender} | {s.dob}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t pt-2.5">
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => handleViewTimeline(s)}
+                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold text-slate-700 rounded-lg flex items-center shadow-sm cursor-pointer"
+                        >
+                          <History className="w-3 h-3 mr-1 text-slate-500" /> Timeline
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedStudentForTransfer(s);
+                            setTransferDestinationSchoolId('');
+                            setShowTransferDialog(true);
+                          }}
+                          className="px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-[10px] font-bold text-blue-700 rounded-lg flex items-center shadow-sm cursor-pointer"
+                        >
+                          <ArrowLeftRight className="w-3 h-3 mr-1" /> Transfer
+                        </button>
+                      </div>
+
+                      <div className="flex space-x-1">
+                        {canEdit && (
+                          <button
+                            onClick={() => handleStartEdit(s)}
+                            disabled={isSaving || deletingId !== null}
+                            className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 border border-slate-200 cursor-pointer shadow-sm"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
+                          <button
+                            onClick={() => handleDelete(s.id)}
+                            disabled={deletingId !== null}
+                            className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 border border-red-100 cursor-pointer shadow-sm"
+                          >
+                            {deletingId === s.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <div className="p-12 text-center text-slate-400">

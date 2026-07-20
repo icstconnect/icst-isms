@@ -328,7 +328,7 @@ export const Subjects: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center">
             <BookOpen className="w-6 h-6 mr-2 text-blue-600" />
@@ -336,7 +336,7 @@ export const Subjects: React.FC = () => {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">Select a scholarship session and configure standard or custom testing subjects.</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
           <button
             onClick={loadPredefinedWBBSE}
             disabled={!selectedSch || isSaving}

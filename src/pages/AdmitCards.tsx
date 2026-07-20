@@ -402,7 +402,7 @@ export const AdmitCards: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans">
-      <div className="flex justify-between items-center no-print">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 no-print">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center">
             <FileText className="w-6 h-6 mr-2 text-blue-600" />
@@ -410,7 +410,7 @@ export const AdmitCards: React.FC = () => {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5 font-medium">Generate, view, and print admission tickets in bulk or per student.</p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
           {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
             <button
               onClick={() => setShowSettingsModal(true)}
