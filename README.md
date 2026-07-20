@@ -191,8 +191,18 @@ CREATE TABLE marks (
 - **Continuous "Save & Next"**: Grade candidates sequentially inside the modal interface.
 
 ### 4. Public Results Portal (`/results`)
-- **Student Lookup**: Public interface enabling candidates to query exam results via Roll Number or Student ID.
-- **Marksheet View**: Displays breakdown of individual subject marks, percentage, grade, and digital validation seal.
+- **Single-Screen Viewport**: Zero-scroll design (`h-screen overflow-hidden`) with integrated header search bar and landing prompt.
+- **Dynamic Subject Names**: Fetches real subject names (*Bengali*, *Mathematics*, *English*, *Physical Science*, *Life Science*, *Geography*, *History*) from session configurations.
+- **3-Column Score Table**: Streamlined mark distribution (Subject Name, Full Marks, Marks Obtained) with Pass Marks column removed.
+- **Digital Verification Seal**: Instant Roll Number validation, QR code payload, and Controller signature profile.
+
+### 5. Result Publishing & Pre-Publication Validation Engine (`/dashboard/security`)
+- **Status Gate**: Results are hidden behind `🔴 Not Published` status until officially released by SuperAdmin.
+- **Audit Checklist Engine**: Verifies 100% attendance, complete subject marks, photo integrity, and mapped school records before allowing publication.
+- **Auto-Rank & Scholarship Allocator**: Calculates Overall Ranks, School Ranks, and scholarship percentages (100%, 60%, 50%, 40% on Full Course Fees; 30% on Admission Fee) and locks session marks upon publication.
+
+### 6. Universal Tailwind Toast & Dialog System
+- **100% Dialog Replacement**: Completely eliminated native browser `alert()` and `confirm()` popups across all 12 modules in favor of styled, non-blocking Tailwind CSS toast notifications and modal dialogs.
 
 ---
 
