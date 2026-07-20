@@ -158,6 +158,7 @@ export const MarksEntry: React.FC = () => {
   };
 
   const handleScoreChange = (studentId: string, subjectId: string, value: string, isAbsent: boolean, maxMarks: number) => {
+    if (!isAuthorizedToEdit) return;
     if (isAbsent) return; 
 
     const key = `${studentId}_${subjectId}`;
@@ -206,6 +207,7 @@ export const MarksEntry: React.FC = () => {
   };
 
   const handleModalScoreChange = (subjectId: string, value: string, maxMarks: number) => {
+    if (!isAuthorizedToEdit) return;
     if (value === '') {
       setModalScores(prev => ({ ...prev, [subjectId]: '' }));
       return;
@@ -218,6 +220,10 @@ export const MarksEntry: React.FC = () => {
   };
 
   const saveSingleStudentMarks = async (studentId: string, studentScores: Record<string, number | ''>) => {
+    if (!isAuthorizedToEdit) {
+      alert("Editing is locked by the administrator.");
+      return;
+    }
     setIsSaving(true);
     let updatedMarks = [...dbMarks];
     
@@ -289,6 +295,7 @@ export const MarksEntry: React.FC = () => {
   };
 
   const handleSaveStudent = async (studentId: string) => {
+    if (!isAuthorizedToEdit) return;
     const errors: string[] = [];
     subjects.forEach(sub => {
       const val = modalScores[sub.id];
@@ -309,6 +316,7 @@ export const MarksEntry: React.FC = () => {
   };
 
   const handleSaveAndNext = async (studentId: string) => {
+    if (!isAuthorizedToEdit) return;
     const errors: string[] = [];
     subjects.forEach(sub => {
       const val = modalScores[sub.id];
@@ -383,6 +391,10 @@ export const MarksEntry: React.FC = () => {
   };
 
   const handleToggleAttendance = async (studentId: string, currentStatus: boolean) => {
+    if (!isAuthorizedToEdit) {
+      alert("Editing is locked by the administrator.");
+      return;
+    }
     const newStatus: 'Present' | 'Absent' = currentStatus ? 'Present' : 'Absent';
     const existing = dbAttendance.find(a => a.student_id === studentId);
     
@@ -499,6 +511,10 @@ export const MarksEntry: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (!isAuthorizedToEdit) {
+      alert("Editing is locked by the administrator.");
+      return;
+    }
     setIsSaving(true);
     let updatedMarks = [...dbMarks];
 
@@ -575,11 +591,16 @@ export const MarksEntry: React.FC = () => {
 
   const isAuthorizedToEdit = useMemo(() => {
     if (!user) return false;
+    
+    // Global Edit Lock Check - if locked, NO ONE can edit (including Admins)
+    if (!marksEditingEnabled || !marksEntryEnabled) return false;
+
+    // If unlocked, check role permissions
     const isSuperAdminOrAdmin = user.role === 'SuperAdmin' || user.role === 'Admin';
     if (isSuperAdminOrAdmin) return true; 
     
     const isCoordinator = user.role === 'ScholarshipCoordinator';
-    return isCoordinator && marksEditingEnabled && marksEntryEnabled;
+    return isCoordinator;
   }, [user, marksEntryEnabled, marksEditingEnabled]);
 
   const activeStudentRow = useMemo(() => {
@@ -666,7 +687,7 @@ export const MarksEntry: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={!isAuthorizedToEdit || Object.keys(localScores).length === 0 || isSaving}
-            className="flex items-center justify-center text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-xl shadow-md cursor-pointer disabled:opacity-50 transition-colors w-full sm:w-auto"
+            className={`flex items-center justify-center text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto ${(!isAuthorizedToEdit || Object.keys(localScores).length === 0 || isSaving) ? '' : 'cursor-pointer'}`}
           >
             {isSaving ? (
               <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
@@ -768,7 +789,7 @@ export const MarksEntry: React.FC = () => {
                           <button
                             disabled={!isAuthorizedToEdit}
                             onClick={() => handleToggleAttendance(row.student.id, row.isAbsent)}
-                            className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer ${
+                            className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all disabled:opacity-60 disabled:cursor-not-allowed ${isAuthorizedToEdit ? 'cursor-pointer' : ''} ${
                               row.isAbsent 
                                 ? 'bg-red-50 text-red-600 border-red-200' 
                                 : 'bg-green-50 text-green-600 border-green-200'
@@ -861,11 +882,11 @@ export const MarksEntry: React.FC = () => {
                           type="button"
                           disabled={!isAuthorizedToEdit}
                           onClick={() => { if (row.isAbsent) handleToggleAttendance(row.student.id, row.isAbsent); }}
-                          className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center ${
+                          className={`py-2 rounded-xl text-xs font-bold border transition-all text-center disabled:opacity-60 disabled:cursor-not-allowed ${
                             !row.isAbsent
                               ? 'bg-green-600 text-white border-transparent shadow-sm'
-                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                          }`}
+                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 disabled:hover:bg-white'
+                          } ${isAuthorizedToEdit ? 'cursor-pointer' : ''}`}
                         >
                           PRESENT
                         </button>
@@ -873,11 +894,11 @@ export const MarksEntry: React.FC = () => {
                           type="button"
                           disabled={!isAuthorizedToEdit}
                           onClick={() => { if (!row.isAbsent) handleToggleAttendance(row.student.id, row.isAbsent); }}
-                          className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center ${
+                          className={`py-2 rounded-xl text-xs font-bold border transition-all text-center disabled:opacity-60 disabled:cursor-not-allowed ${
                             row.isAbsent
                               ? 'bg-red-600 text-white border-transparent shadow-sm'
-                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                          }`}
+                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 disabled:hover:bg-white'
+                          } ${isAuthorizedToEdit ? 'cursor-pointer' : ''}`}
                         >
                           ABSENT
                         </button>
@@ -1120,7 +1141,7 @@ export const MarksEntry: React.FC = () => {
                   type="button"
                   disabled={!isAuthorizedToEdit || isSaving}
                   onClick={() => handleSaveStudent(activeStudentRow.student.id)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 rounded-xl transition-colors cursor-pointer shadow flex justify-center items-center"
+                  className={`flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 rounded-xl transition-colors shadow flex justify-center items-center disabled:opacity-60 disabled:cursor-not-allowed ${(!isAuthorizedToEdit || isSaving) ? '' : 'cursor-pointer'}`}
                 >
                   {isSaving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
                   Save Marks
@@ -1132,7 +1153,7 @@ export const MarksEntry: React.FC = () => {
                   type="button"
                   disabled={isSaving}
                   onClick={() => handleSaveAndNext(activeStudentRow.student.id)}
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2.5 rounded-xl transition-colors cursor-pointer flex justify-center items-center gap-1.5"
+                  className={`w-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2.5 rounded-xl transition-colors shadow flex justify-center items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed ${isSaving ? '' : 'cursor-pointer'}`}
                 >
                   Save & Next Student ➡️
                 </button>
