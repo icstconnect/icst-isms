@@ -197,14 +197,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
 
-          alert("Invalid email credentials.");
+          console.warn("Invalid email credentials provided during sign-in attempt.");
           setLoading(false);
           return false;
         }
       }
     } catch (e: any) {
-      console.error(e);
-      alert(e.message || "Authentication failed.");
+      console.error("Authentication error:", e);
       setLoading(false);
       return false;
     }

@@ -22,8 +22,10 @@ import {
 import { DatePicker } from '../components/DatePicker';
 import { SkeletonCard } from '../components/Skeleton';
 import { ImageUpload } from '../components/ImageUpload';
+import { useToast } from '../context/ToastContext';
 
 export const Officials: React.FC = () => {
+  const { toast, showConfirm } = useToast();
   const [officials, setOfficials] = useState<Profile[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [activeTab, setActiveTab] = useState<'list' | 'chart'>('list');
@@ -125,7 +127,7 @@ export const Officials: React.FC = () => {
     if (!name.trim() || !email.trim()) return;
 
     if (!photoUrl) {
-      alert("Please upload a profile photograph for the committee member.");
+      toast.warning("Please upload a profile photograph for the committee member.");
       return;
     }
 
@@ -155,7 +157,7 @@ export const Officials: React.FC = () => {
             .eq('id', editingOfficial.id);
           if (error) throw error;
         } catch (err: any) {
-          alert(err.message || "Failed to update profile in Supabase.");
+          toast.error(err.message || "Failed to update profile in Supabase.");
           return;
         }
       }
@@ -179,13 +181,13 @@ export const Officials: React.FC = () => {
             .insert(newOfficialData);
           if (error) {
             if (error.code === '23503') {
-              alert("Error 23503: The specified UUID does not match any user in Supabase Auth. Please match the UUID with Supabase Auth or disable Supabase sync offline.");
+              toast.error("Error 23503: The specified UUID does not match any user in Supabase Auth. Please match the UUID with Supabase Auth or disable Supabase sync offline.");
               return;
             }
             throw error;
           }
         } catch (err: any) {
-          alert(err.message || "Failed to insert profile into Supabase.");
+          toast.error(err.message || "Failed to insert profile into Supabase.");
           return;
         }
       }
@@ -195,7 +197,7 @@ export const Officials: React.FC = () => {
       clearForm();
     }
     loadData();
-    alert("Official profile processed successfully.");
+    toast.success("Official profile processed successfully.");
   };
 
   const handleStartEdit = (off: Profile) => {
@@ -220,29 +222,36 @@ export const Officials: React.FC = () => {
     setShowAddForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this official?")) return;
+  const handleDelete = (id: string) => {
+    showConfirm({
+      title: "Delete Official Profile?",
+      message: "Are you sure you want to delete this official profile?",
+      type: 'danger',
+      confirmText: "Delete Official",
+      onConfirm: async () => {
+        if (isSupabaseConfigured && supabase) {
+          try {
+            const { error } = await supabase
+              .from('profiles')
+              .delete()
+              .eq('id', id);
+            if (error) throw error;
+          } catch (err: any) {
+            toast.error(err.message || "Failed to delete official from Supabase.");
+            return;
+          }
+        }
 
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
-      } catch (err: any) {
-        alert(err.message || "Failed to delete official from Supabase.");
-        return;
+        mockDb.deleteRecord('profiles', id);
+        loadData();
+        toast.success("Official profile deleted.");
       }
-    }
-
-    mockDb.deleteRecord('profiles', id);
-    loadData();
+    });
   };
 
   const handleAddHistPosition = () => {
     if (!newHistPosition.trim() || !newHistStart) {
-      alert("Position name and Start Date are required.");
+      toast.warning("Position name and Start Date are required.");
       return;
     }
     setHistoricalPositions([

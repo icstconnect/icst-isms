@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Login } from './pages/Login';
 import { Results } from './pages/Results';
@@ -39,133 +40,135 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          {/* Public Authentication Screen */}
-          <Route path="/" element={<Login />} />
+      <ToastProvider>
+        <Router>
+          <Routes>
+            {/* Public Authentication Screen */}
+            <Route path="/" element={<Login />} />
 
-          {/* Public Results Verification Portal */}
-          <Route path="/results" element={<Results />} />
+            {/* Public Results Verification Portal */}
+            <Route path="/results" element={<Results />} />
 
-          {/* Public Committee Honour Portal */}
-          <Route path="/committee" element={<CommitteeHonour />} />
+            {/* Public Committee Honour Portal */}
+            <Route path="/committee" element={<CommitteeHonour />} />
 
-          {/* Protected Dashboard Admin Pages */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <DashboardHome />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/scholarships"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Scholarships />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/subjects"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Subjects />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/schools"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Schools />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/students"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Students />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/special-reg"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <SpecialReg />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/admit-cards"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <AdmitCards />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/marks-entry"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <MarksEntry />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/officials"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Officials />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/reports"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Reports />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard/security"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Security />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected Dashboard Admin Pages */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <DashboardHome />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/scholarships"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Scholarships />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/subjects"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Subjects />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/schools"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Schools />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/students"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Students />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/special-registration"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <SpecialReg />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/admit-cards"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <AdmitCards />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/marks-entry"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <MarksEntry />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/officials"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Officials />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/reports"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Reports />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/security"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Security />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Global Catch-all fallback redirect */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+            {/* Fallback redirect */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </ToastProvider>
     </AuthProvider>
   );
 }

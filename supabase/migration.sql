@@ -97,3 +97,25 @@ CREATE TABLE IF NOT EXISTS public.security_alerts (
   remarks TEXT
 );
 
+-- RLS Policies for New Tables
+ALTER TABLE public.student_transfers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all operations on student_transfers" ON public.student_transfers;
+CREATE POLICY "Allow all operations on student_transfers" ON public.student_transfers FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.student_timeline ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all operations on student_timeline" ON public.student_timeline;
+CREATE POLICY "Allow all operations on student_timeline" ON public.student_timeline FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.settings_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all operations on settings_config" ON public.settings_config;
+CREATE POLICY "Allow all operations on settings_config" ON public.settings_config FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.login_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all operations on login_history" ON public.login_history;
+CREATE POLICY "Allow all operations on login_history" ON public.login_history FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.security_alerts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all operations on security_alerts" ON public.security_alerts;
+CREATE POLICY "Allow all operations on security_alerts" ON public.security_alerts FOR ALL USING (true) WITH CHECK (true);
+
+

@@ -133,6 +133,13 @@ CREATE TABLE admit_cards (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- 7. System Settings Table (for signature profiles, watermark settings, global configuration)
+CREATE TABLE IF NOT EXISTS system_settings (
+  id TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
 CREATE INDEX idx_admit_cards_roll ON admit_cards(roll_number);
 
 -- 7. Attendance Table

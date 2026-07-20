@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { mockDb, School, Student, AdmitCard, Mark, Attendance } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { 
   School as SchoolIcon, 
   Plus, 
@@ -46,6 +47,7 @@ import { SkeletonTable } from '../components/Skeleton';
 
 export const Schools: React.FC = () => {
   const { user } = useAuth();
+  const { toast, showConfirm } = useToast();
   const [schools, setSchools] = useState<School[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [admitCards, setAdmitCards] = useState<AdmitCard[]>([]);
@@ -224,9 +226,9 @@ export const Schools: React.FC = () => {
         clearForm();
       }
       loadData();
-      alert("School record saved successfully.");
+      toast.success("School record saved successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to save school.");
+      toast.error(err.message || "Failed to save school.");
     } finally {
       setIsSaving(false);
     }
@@ -247,26 +249,33 @@ export const Schools: React.FC = () => {
     setShowAddForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this school? This will cascade delete associated students, admit cards, and scores.")) return;
+  const handleDelete = (id: string) => {
+    showConfirm({
+      title: "Delete School Record?",
+      message: "Are you sure you want to delete this school? This will cascade delete associated students, admit cards, and scores.",
+      type: 'danger',
+      confirmText: "Delete School",
+      onConfirm: async () => {
+        setDeletingId(id);
+        try {
+          if (isSupabaseConfigured && supabase) {
+            const { error } = await supabase
+              .from('schools')
+              .delete()
+              .eq('id', id);
+            if (error) throw error;
+          }
 
-    setDeletingId(id);
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase
-          .from('schools')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
+          mockDb.deleteRecord('schools', id);
+          loadData();
+          toast.success("School deleted successfully.");
+        } catch (err: any) {
+          toast.error(err.message || "Failed to delete school.");
+        } finally {
+          setDeletingId(null);
+        }
       }
-
-      mockDb.deleteRecord('schools', id);
-      loadData();
-    } catch (err: any) {
-      alert(err.message || "Failed to delete school.");
-    } finally {
-      setDeletingId(null);
-    }
+    });
   };
 
   // B1 workflow actions: status change
@@ -296,9 +305,9 @@ export const Schools: React.FC = () => {
 
       mockDb.updateRecord<School>('schools', scl.id, updates);
       loadData();
-      alert(`School status updated to ${newStatus}.`);
+      toast.success(`School status updated to ${newStatus}.`);
     } catch (e: any) {
-      alert("Failed to update status: " + e.message);
+      toast.error("Failed to update status: " + e.message);
     }
   };
 
@@ -326,7 +335,7 @@ export const Schools: React.FC = () => {
       const text = event.target?.result as string;
       const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
       if (lines.length <= 1) {
-        alert("Invalid template layout or empty file.");
+        toast.warning("Invalid template layout or empty file.");
         return;
       }
 
@@ -364,7 +373,6 @@ export const Schools: React.FC = () => {
           errors.push("Invalid email domain layout");
         }
 
-        // Duplicate checks
         const dupUdise = allSchools.some(s => s.udise === rowData.udise);
         const dupEmail = allSchools.some(s => s.email === rowData.email);
         
@@ -383,7 +391,7 @@ export const Schools: React.FC = () => {
 
       setImportPreview(rows);
       setShowImportModal(true);
-      e.target.value = ''; // Reset input
+      e.target.value = '';
     };
     reader.readAsText(file);
   };
@@ -391,7 +399,7 @@ export const Schools: React.FC = () => {
   const handleConfirmImport = async () => {
     const importable = importPreview.filter(row => row.isValid || (!skipInvalidRows && row.errors.length === 0));
     if (importable.length === 0) {
-      alert("No valid rows available to import.");
+      toast.warning("No valid rows available to import.");
       return;
     }
 
@@ -436,11 +444,11 @@ export const Schools: React.FC = () => {
         importedCount++;
       }
 
-      alert(`Successfully imported ${importedCount} schools!`);
+      toast.success(`Successfully imported ${importedCount} schools!`);
       setShowImportModal(false);
       loadData();
     } catch (e: any) {
-      alert("Error executing bulk import: " + e.message);
+      toast.error("Error executing bulk import: " + e.message);
     }
   };
 
@@ -1144,13 +1152,13 @@ export const Schools: React.FC = () => {
               <button
                 onClick={() => {
                   if (!rejectionReason.trim()) {
-                    alert("A rejection reason is required.");
+                    toast.warning("A rejection reason is required.");
                     return;
                   }
                   handleStatusChange(rejectionModalSchool, 'Rejected', rejectionReason);
                   setRejectionModalSchool(null);
                 }}
-                className="text-white bg-red-600 hover:bg-red-500 text-sm px-4 py-2.5 rounded-xl font-bold shadow-md cursor-pointer"
+                className="text-white bg-red-600 hover:bg-red-500 text-sm px-4 py-2 rounded-xl font-bold cursor-pointer"
               >
                 Confirm Rejection
               </button>

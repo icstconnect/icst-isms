@@ -4,8 +4,10 @@ import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { Award, Plus, Calendar, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { SkeletonCard } from '../components/Skeleton';
 import { DatePicker } from '../components/DatePicker';
+import { useToast } from '../context/ToastContext';
 
 export const Scholarships: React.FC = () => {
+  const { toast, showConfirm } = useToast();
   const [scholarships, setScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -114,9 +116,10 @@ export const Scholarships: React.FC = () => {
         setScholarships([...scholarships, newSch]);
         setShowAddForm(false);
         clearForm();
+        toast.success("Scholarship session created successfully.");
       }
     } catch (err: any) {
-      alert(err.message || "Failed to save scholarship.");
+      toast.error(err.message || "Failed to save scholarship.");
     } finally {
       setIsSaving(false);
     }
@@ -131,26 +134,33 @@ export const Scholarships: React.FC = () => {
     setShowAddForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this scholarship? All related subjects, students, marks and logs will be permanently deleted.")) return;
+  const handleDelete = (id: string) => {
+    showConfirm({
+      title: "Delete Scholarship Session?",
+      message: "Are you sure you want to delete this scholarship? All related subjects, students, marks and logs will be permanently deleted.",
+      type: 'danger',
+      confirmText: "Delete Session",
+      onConfirm: async () => {
+        setDeletingId(id);
+        try {
+          if (isSupabaseConfigured && supabase) {
+            const { error } = await supabase
+              .from('scholarships')
+              .delete()
+              .eq('id', id);
+            if (error) throw error;
+          }
 
-    setDeletingId(id);
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase
-          .from('scholarships')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
+          mockDb.deleteRecord('scholarships', id);
+          setScholarships(scholarships.filter(s => s.id !== id));
+          toast.success("Scholarship session deleted.");
+        } catch (err: any) {
+          toast.error(err.message || "Failed to delete scholarship.");
+        } finally {
+          setDeletingId(null);
+        }
       }
-
-      mockDb.deleteRecord('scholarships', id);
-      setScholarships(scholarships.filter(s => s.id !== id));
-    } catch (err: any) {
-      alert(err.message || "Failed to delete scholarship.");
-    } finally {
-      setDeletingId(null);
-    }
+    });
   };
 
   const handleStatusChange = async (id: string, newStatus: Scholarship['status']) => {
@@ -167,9 +177,10 @@ export const Scholarships: React.FC = () => {
       const updated = mockDb.updateRecord<Scholarship>('scholarships', id, { status: newStatus });
       if (updated) {
         setScholarships(scholarships.map(s => s.id === id ? updated : s));
+        toast.success(`Scholarship status updated to ${newStatus}.`);
       }
     } catch (err: any) {
-      alert(err.message || "Failed to update status.");
+      toast.error(err.message || "Failed to update status.");
     } finally {
       setStatusChangingId(null);
     }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard } from '../services/mockDb';
+import { getActiveSignatureProfile, SignatureProfile } from '../services/settingsService';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { UserCheck, Printer, QrCode, RefreshCw, Sparkles, Building, Phone, MapPin, User, FileText } from 'lucide-react';
@@ -32,12 +33,18 @@ export const SpecialReg: React.FC = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [activeSigProfile, setActiveSigProfile] = useState<SignatureProfile | null>(null);
 
   // Fetch active scholarships & schools on mount
   useEffect(() => {
     const loadSessionAndSchools = async () => {
       setIsLoading(true);
       setError('');
+
+      // Fetch active signature profile from database
+      const profile = await getActiveSignatureProfile();
+      setActiveSigProfile(profile);
+
       if (isSupabaseConfigured && supabase) {
         try {
           // Fetch scholarships in stages that are active for registration/exam
@@ -546,88 +553,108 @@ export const SpecialReg: React.FC = () => {
               </div>
 
               {/* Print Admit Card Structure */}
-              <div className="bg-white border-2 border-slate-800 p-6 rounded-lg text-slate-800 shadow-md relative print:shadow-none print:border-slate-800 max-w-lg mx-auto font-sans">
-                <div className="text-center pb-3 border-b-2 border-slate-800">
-                  <h4 className="font-extrabold text-sm uppercase tracking-wider">ICST Scholarship Committee</h4>
-                  <div className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mt-0.5">ADMIT CARD</div>
-                </div>
-
-                <div className="flex justify-between items-start my-4">
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <span className="font-bold text-slate-400 uppercase tracking-wider block text-[9px]">Roll Number</span>{' '}
-                      <span className="font-black text-slate-900 font-mono text-base">{registeredCard.card.roll_number}</span>
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-400 uppercase tracking-wider block text-[9px]">Student Name</span>{' '}
-                      <span className="font-extrabold text-slate-900">{registeredCard.student.name}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="font-bold text-slate-400 uppercase tracking-wider block text-[9px]">Class & Section</span>{' '}
-                        <span className="font-semibold text-slate-700">{registeredCard.student.class} ({registeredCard.student.section})</span>
-                      </div>
-                      <div>
-                        <span className="font-bold text-slate-400 uppercase tracking-wider block text-[9px]">School Roll No</span>{' '}
-                        <span className="font-semibold text-slate-700">{registeredCard.student.school_roll_no}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-400 uppercase tracking-wider block text-[9px]">School Name</span>{' '}
-                      <span className="font-semibold text-slate-700 break-words">{registeredCard.school?.name}</span>
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-400 uppercase tracking-wider block text-[9px]">Date of Birth</span>{' '}
-                      <span className="font-semibold text-slate-700">{registeredCard.student.dob}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center space-y-3">
-                    {/* Photo Box */}
-                    {registeredCard.student.photo_url ? (
-                      <img 
-                        src={registeredCard.student.photo_url} 
-                        alt="Candidate" 
-                        className="w-20 h-24 object-cover border border-slate-300 rounded" 
-                      />
+              <div className="bg-white border-2 border-black p-4 rounded-lg text-black shadow-md relative print:shadow-none print:border-black max-w-lg mx-auto font-sans">
+                {/* Header */}
+                <div className="border-b-2 border-black pb-2 mb-2 flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    {activeSigProfile?.institution_logo ? (
+                      <img src={activeSigProfile.institution_logo} alt="Logo" className="w-10 h-10 object-contain grayscale" />
                     ) : (
-                      <div className="w-20 h-24 border border-slate-300 bg-slate-50 rounded flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase text-center p-2">
-                        Photo Attested on Spot
+                      <div className="w-10 h-10 border border-black flex items-center justify-center font-black text-xs text-center">
+                        ICST
                       </div>
                     )}
-                    {/* QR Code image loaded dynamically from qrserver API */}
+                    <div>
+                      <h4 className="font-black text-xs uppercase tracking-wide leading-none">ICST SCHOLARSHIP EXAMINATION</h4>
+                      <div className="text-[8px] font-bold uppercase tracking-wider mt-0.5 text-black">
+                        EMERGENCY ADMIT CARD | SESSION {activeSch?.academic_year || '2027-2028'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-center">
                     <img 
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(registeredCard.card.qr_code_payload)}`} 
                       alt="Verify QR" 
-                      className="w-16 h-16 border p-0.5 rounded"
+                      className="w-10 h-10 border border-black p-0.5"
                     />
+                    <div className="text-[6px] font-bold uppercase mt-0.5">Scan to Verify</div>
                   </div>
                 </div>
 
-                {/* Schedule specifications */}
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs space-y-1 mb-4">
-                  <div className="font-bold text-slate-800 mb-1">Exam Details:</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>Exam Date: <strong className="text-slate-800">{registeredCard.card.exam_date}</strong></div>
-                    <div>Reporting: <strong className="text-slate-800">{registeredCard.card.reporting_time}</strong></div>
+                {/* Details Grid */}
+                <div className="flex justify-between items-start my-2 text-[9px] gap-2">
+                  <div className="space-y-1 flex-1">
+                    <div><strong>Roll Number:</strong> <span className="font-black font-mono text-[11px]">{registeredCard.card.roll_number}</span></div>
+                    <div><strong>Student Name:</strong> <span className="font-black uppercase">{registeredCard.student.name}</span></div>
+                    <div><strong>Father's Name:</strong> {registeredCard.student.father_name || 'N/A'}</div>
+                    <div><strong>School Name:</strong> {registeredCard.school?.name}</div>
+                    <div><strong>Class & Section:</strong> {registeredCard.student.class} ({registeredCard.student.section}) | <strong>Roll:</strong> {registeredCard.student.school_roll_no}</div>
+                    <div><strong>Date of Birth:</strong> {registeredCard.student.dob}</div>
                   </div>
-                  <div>Exam Venue: <strong className="text-slate-800">{registeredCard.card.venue}</strong></div>
+
+                  <div className="flex flex-col items-center gap-1 w-16 shrink-0">
+                    {registeredCard.student.photo_url ? (
+                      <img src={registeredCard.student.photo_url} alt="Candidate" className="w-16 h-20 object-cover border border-black" />
+                    ) : (
+                      <div className="w-16 h-20 border border-black bg-gray-50 flex items-center justify-center text-[7px] font-bold text-gray-500 text-center p-1 uppercase">
+                        Photo Attested
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="text-[9px] text-slate-400 uppercase tracking-wider pb-1 border-b">Instructions:</div>
-                <div className="text-[8px] text-slate-500 leading-tight mt-1 whitespace-pre-line">
-                  {registeredCard.card.instructions}
+                {/* Exam Details */}
+                <div className="border border-black p-1.5 rounded text-[8.5px] leading-tight mb-2 bg-gray-50">
+                  <div><strong>Exam Date:</strong> {registeredCard.card.exam_date} | <strong>Reporting:</strong> {registeredCard.card.reporting_time}</div>
+                  <div><strong>Exam Venue:</strong> {registeredCard.card.venue}</div>
                 </div>
 
-                {/* Signature lines */}
-                <div className="mt-8 flex justify-between items-end text-[9px] font-bold text-slate-400 uppercase">
+                {/* Bengali Scholarship Table */}
+                <div className="border border-black rounded mb-2 overflow-hidden">
+                  <div className="bg-black text-white text-[7.5px] font-bold px-1.5 py-0.5 uppercase text-center">
+                    স্কলারশিপের বিবরণ ও সুবিধাসমূহ (Scholarship Details)
+                  </div>
+                  <table className="w-full text-[7.5px] border-collapse">
+                    <tbody>
+                      <tr className="border-b border-black/30">
+                        <td className="border-r border-black/30 p-0.5 text-center font-bold">সমগ্র পরীক্ষায় ১ম স্থান</td>
+                        <td className="p-0.5 pl-2 font-bold text-left">সম্পূর্ণ কোর্স ফিতে ১০০% স্কলারশিপ</td>
+                      </tr>
+                      <tr className="border-b border-black/30">
+                        <td className="border-r border-black/30 p-0.5 text-center font-bold">বিদ্যালয়ে ১ম/২য়/৩য় স্থান</td>
+                        <td className="p-0.5 pl-2 font-bold text-left">সম্পূর্ণ কোর্স ফিতে ৬০% / ৫০% / ৪০%</td>
+                      </tr>
+                      <tr>
+                        <td className="border-r border-black/30 p-0.5 text-center font-bold">সকল পরীক্ষার্থী</td>
+                        <td className="p-0.5 pl-2 font-bold text-left">ভর্তি ফিতে ৩০% ছাড়</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div className="bg-gray-50 border-t border-black text-[6.5px] font-bold p-0.5 text-center leading-tight">
+                    ★ স্কলারশিপ শুধুমাত্র ২০২৭–২০১৮ শিক্ষাবর্ষে ICST Chowberia-এ কম্পিউটার কোর্সে ভর্তির ক্ষেত্রে প্রযোজ্য।
+                  </div>
+                </div>
+
+                {/* Signatures */}
+                <div className="border-t-2 border-black pt-2 flex justify-between items-end text-[8px] font-bold uppercase">
                   <div className="text-center">
-                    <div className="w-24 border-b border-slate-300 h-6"></div>
-                    <div className="mt-1">Invigilator Sign</div>
+                    <div className="w-20 border-b border-black h-4 mb-0.5"></div>
+                    <div>Invigilator Sign</div>
                   </div>
-                  <div className="text-center">
-                    <div className="w-24 border-b border-slate-300 h-6 flex items-center justify-center italic font-normal text-slate-500 font-serif">Sourav Mukherjee</div>
-                    <div className="mt-1">Controller of Exam</div>
+                  <div className="flex items-end space-x-2">
+                    {activeSigProfile?.official_seal && (
+                      <img src={activeSigProfile.official_seal} alt="Seal" className="w-8 h-8 object-contain grayscale" />
+                    )}
+                    <div className="text-center">
+                      {activeSigProfile?.signature_image ? (
+                        <img src={activeSigProfile.signature_image} alt="Signature" className="h-5 object-contain mb-0.5 grayscale" />
+                      ) : (
+                        <div className="h-5 italic text-[8px] text-gray-500">Controller Sign</div>
+                      )}
+                      <div className="w-20 border-b border-black"></div>
+                      <div className="text-[8px] font-black mt-0.5">{activeSigProfile?.name || 'Sourav Mukherjee'}</div>
+                      <div className="text-[6.5px] font-semibold text-gray-700">{activeSigProfile?.designation || 'Controller of Exam'}</div>
+                    </div>
                   </div>
                 </div>
               </div>

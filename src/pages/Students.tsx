@@ -10,6 +10,7 @@ import {
 } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { ImageUpload } from '../components/ImageUpload';
 import { 
   UserSquare2, 
@@ -37,6 +38,7 @@ import { SkeletonTable } from '../components/Skeleton';
 
 export const Students: React.FC = () => {
   const { user } = useAuth();
+  const { toast, showConfirm } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   
   const [dbScholarships, setDbScholarships] = useState<Scholarship[]>([]);
@@ -355,9 +357,9 @@ export const Students: React.FC = () => {
       setShowAddForm(false);
       clearForm();
       loadData();
-      alert("Candidate record processed successfully.");
+      toast.success("Candidate record processed successfully.");
     } catch (err: any) {
-      alert("Failed to save candidate: " + err.message);
+      toast.error("Failed to save candidate: " + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -370,7 +372,7 @@ export const Students: React.FC = () => {
     // B1: Check school suspension
     const targetSchool = dbSchools.find(s => s.id === selectedScl);
     if (targetSchool?.status === 'Suspended') {
-      alert("Registration blocked: The selected school is currently Suspended. Registrations from this school cannot proceed.");
+      toast.warning("Registration blocked: The selected school is currently Suspended. Registrations from this school cannot proceed.");
       setIsSaving(false);
       return;
     }
@@ -381,7 +383,7 @@ export const Students: React.FC = () => {
     
     // Coordinators cannot register/edit after closure
     if (user && user.role === 'ScholarshipCoordinator' && !isRegistrationOpen) {
-      alert("Registration closed: The registration period for this scholarship session has expired.");
+      toast.warning("Registration closed: The registration period for this scholarship session has expired.");
       setIsSaving(false);
       return;
     }
@@ -389,12 +391,12 @@ export const Students: React.FC = () => {
     // Coordinators need specific permission
     if (user && user.role === 'ScholarshipCoordinator') {
       if (editingStudent && !user.permissions?.includes('edit_students')) {
-        alert("Permission denied: You do not have permission to modify student records.");
+        toast.error("Permission denied: You do not have permission to modify student records.");
         setIsSaving(false);
         return;
       }
       if (!editingStudent && !user.permissions?.includes('register_students')) {
-        alert("Permission denied: You do not have permission to register new students.");
+        toast.error("Permission denied: You do not have permission to register new students.");
         setIsSaving(false);
         return;
       }
@@ -434,7 +436,7 @@ export const Students: React.FC = () => {
       if (user && (user.role === 'SuperAdmin' || user.role === 'Admin')) {
         setShowOverrideDialog(true);
       } else {
-        alert("Registration blocked: Potential duplicate candidates detected. Only administrators may override this warning.");
+        toast.warning("Registration blocked: Potential duplicate candidates detected. Only administrators may override this warning.");
       }
       return;
     }
@@ -447,7 +449,7 @@ export const Students: React.FC = () => {
     const activeSch = dbScholarships.find(sch => sch.id === s.scholarship_id);
     const isRegistrationOpen = activeSch ? new Date(activeSch.registration_end) > new Date() : true;
     if (user && user.role === 'ScholarshipCoordinator' && !isRegistrationOpen) {
-      alert("Registration closed: Editing student details is disabled as the registration period has closed.");
+      toast.warning("Registration closed: Editing student details is disabled as the registration period has closed.");
       return;
     }
 
@@ -482,42 +484,48 @@ export const Students: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this candidate? This will delete all attendance records and marks for this student.")) return;
+  const handleDelete = (id: string) => {
+    showConfirm({
+      title: "Delete Candidate Record?",
+      message: "Are you sure you want to delete this candidate? This will delete all attendance records and marks for this student.",
+      type: 'danger',
+      confirmText: "Delete Candidate",
+      onConfirm: async () => {
+        setDeletingId(id);
+        try {
+          if (isSupabaseConfigured && supabase) {
+            const { error } = await supabase
+              .from('students')
+              .delete()
+              .eq('id', id);
+            if (error) throw error;
+          }
 
-    setDeletingId(id);
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase
-          .from('students')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
+          mockDb.deleteRecord('students', id);
+          setStudents(students.filter(s => s.id !== id));
+          toast.success("Candidate deleted successfully.");
+        } catch (err: any) {
+          toast.error("Failed to delete candidate: " + err.message);
+        } finally {
+          setDeletingId(null);
+        }
       }
-
-      mockDb.deleteRecord('students', id);
-      setStudents(students.filter(s => s.id !== id));
-      alert("Candidate deleted successfully.");
-    } catch (err: any) {
-      alert("Failed to delete candidate: " + err.message);
-    } finally {
-      setDeletingId(null);
-    }
+    });
   };
 
   // C2 Update rules settings in local storage
   const handleSaveRules = () => {
     mockDb.setSetting('duplicate_rules', duplicateRules);
     setShowRulesConfig(false);
-    alert("Duplicate check rules updated.");
+    toast.success("Duplicate check rules updated.");
   };
 
   // C3 Timeline logs loader
   const handleViewTimeline = (stu: Student) => {
     setSelectedStudentForTimeline(stu);
     const events = mockDb.getData<StudentTimelineEvent>('student_timeline')
-      .filter(evt => evt.student_id === stu.id)
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      .filter(e => e.student_id === stu.id)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     setTimelineEvents(events);
   };
 
@@ -529,7 +537,7 @@ export const Students: React.FC = () => {
     // Check if exam marks entry has started
     const sch = dbScholarships.find(s => s.id === selectedStudentForTransfer.scholarship_id);
     if (sch && ['MarksEntry', 'ResultsPublished', 'Completed'].includes(sch.status)) {
-      alert("Transfer blocked: Cannot request student transfers after the examination phase has started.");
+      toast.warning("Transfer blocked: Cannot request student transfers after the examination phase has started.");
       return;
     }
 
@@ -547,9 +555,16 @@ export const Students: React.FC = () => {
     try {
       let insertedId = `trf-${Date.now()}`;
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('student_transfers').insert(requestData).select().single();
-        if (error) throw error;
-        if (data) insertedId = data.id;
+        try {
+          const { data, error } = await supabase.from('student_transfers').insert(requestData).select().single();
+          if (error) throw error;
+          if (data) insertedId = data.id;
+        } catch (spErr: any) {
+          console.warn("Supabase student_transfers write failed (RLS/network), saving locally:", spErr);
+          if (spErr.code === '42501' || spErr.message?.includes('row-level security')) {
+            toast.warning("Supabase RLS restricted remote write. Transfer request saved locally in session.");
+          }
+        }
       }
 
       mockDb.addRecord<StudentTransfer>('student_transfers', {
@@ -564,13 +579,13 @@ export const Students: React.FC = () => {
         user?.name
       );
 
-      alert("Transfer request submitted. Awaiting administrator approval.");
+      toast.info("Transfer request submitted. Awaiting administrator approval.");
       setShowTransferDialog(false);
       setSelectedStudentForTransfer(null);
       setTransferReason('');
       loadData();
     } catch (err: any) {
-      alert("Failed to submit transfer request: " + err.message);
+      toast.error("Failed to submit transfer request: " + err.message);
     }
   };
 
@@ -588,8 +603,12 @@ export const Students: React.FC = () => {
 
     try {
       if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.from('student_transfers').update(updates).eq('id', request.id);
-        if (error) throw error;
+        try {
+          const { error } = await supabase.from('student_transfers').update(updates).eq('id', request.id);
+          if (error) throw error;
+        } catch (spErr: any) {
+          console.warn("Supabase student_transfers update failed, saving locally:", spErr);
+        }
       }
 
       mockDb.updateRecord<StudentTransfer>('student_transfers', request.id, updates);
@@ -602,12 +621,12 @@ export const Students: React.FC = () => {
         user?.name
       );
 
-      alert(`Transfer request ${newStatus.toLowerCase()}.`);
+      toast.info(`Transfer request ${newStatus.toLowerCase()}.`);
       setTransferRejectRequest(null);
       setTransferRejectReason('');
       loadData();
     } catch (e: any) {
-      alert("Failed to update transfer: " + e.message);
+      toast.error("Failed to update transfer: " + e.message);
     }
   };
 
@@ -625,15 +644,23 @@ export const Students: React.FC = () => {
       if (isConfirm) {
         // Complete transfer: Update school_id of student in database
         if (isSupabaseConfigured && supabase) {
-          const { error } = await supabase.from('students').update({ school_id: request.to_school_id }).eq('id', request.student_id);
-          if (error) throw error;
+          try {
+            const { error } = await supabase.from('students').update({ school_id: request.to_school_id }).eq('id', request.student_id);
+            if (error) throw error;
+          } catch (spErr: any) {
+            console.warn("Supabase students school update failed, updating locally:", spErr);
+          }
         }
         mockDb.updateRecord<Student>('students', request.student_id, { school_id: request.to_school_id });
       }
 
       if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.from('student_transfers').update(updates).eq('id', request.id);
-        if (error) throw error;
+        try {
+          const { error } = await supabase.from('student_transfers').update(updates).eq('id', request.id);
+          if (error) throw error;
+        } catch (spErr: any) {
+          console.warn("Supabase student_transfers update failed, updating locally:", spErr);
+        }
       }
 
       mockDb.updateRecord<StudentTransfer>('student_transfers', request.id, updates);
@@ -649,10 +676,10 @@ export const Students: React.FC = () => {
         user?.name
       );
 
-      alert(`Transfer request ${newStatus.toLowerCase()}.`);
+      toast.success(`Transfer request ${newStatus.toLowerCase()}.`);
       loadData();
     } catch (e: any) {
-      alert("Failed to confirm transfer: " + e.message);
+      toast.error("Failed to confirm transfer: " + e.message);
     }
   };
 
@@ -1479,7 +1506,7 @@ export const Students: React.FC = () => {
               <button
                 onClick={() => {
                   if (!overrideRemarks.trim()) {
-                    alert("Override reason comments are mandatory.");
+                    toast.warning("Override reason comments are mandatory.");
                     return;
                   }
                   setShowOverrideDialog(false);
@@ -1681,7 +1708,7 @@ export const Students: React.FC = () => {
               <button
                 onClick={() => {
                   if (!transferRejectReason.trim()) {
-                    alert("A reason comment is required.");
+                    toast.warning("A reason comment is required.");
                     return;
                   }
                   handleAdminTransferAction(transferRejectRequest, false);

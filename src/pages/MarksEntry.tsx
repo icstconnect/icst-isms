@@ -2,11 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, Subject, Mark, Attendance } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Database, ShieldAlert, CheckCircle, Save, Lock, Unlock, Layers, Loader2, Pencil, X } from 'lucide-react';
 import { SkeletonTable } from '../components/Skeleton';
 
 export const MarksEntry: React.FC = () => {
   const { user } = useAuth();
+  const { toast, showConfirm } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   
   // Database states loaded from Supabase or mockDb
@@ -98,7 +100,7 @@ export const MarksEntry: React.FC = () => {
         if (currentLockedState) {
           if (activeModalStudentId) {
             setActiveModalStudentId(null);
-            alert("Editing has been locked by the administrator.");
+            toast.warning("Editing has been locked by the administrator.");
           }
           setModalScores({});
           setLocalScores({});
@@ -192,7 +194,7 @@ export const MarksEntry: React.FC = () => {
 
   const handleOpenMarksModal = (studentId: string, marksMap: Record<string, { id: string | null, score: number | '' }>) => {
     if (!isAuthorizedToEdit) {
-      alert("Marks entry is currently locked by the administrator.");
+      toast.warning("Marks entry is currently locked by the administrator.");
       return;
     }
     setActiveModalStudentId(studentId);
@@ -221,7 +223,7 @@ export const MarksEntry: React.FC = () => {
 
   const saveSingleStudentMarks = async (studentId: string, studentScores: Record<string, number | ''>) => {
     if (!isAuthorizedToEdit) {
-      alert("Editing is locked by the administrator.");
+      toast.warning("Editing is locked by the administrator.");
       return;
     }
     setIsSaving(true);
@@ -257,7 +259,7 @@ export const MarksEntry: React.FC = () => {
             if (error) throw error;
           }
         } catch (err: any) {
-          alert(`Failed to save mark for candidate: ${err.message}`);
+          toast.error(`Failed to save mark for candidate: ${err.message}`);
           throw err;
         }
       }
@@ -307,7 +309,7 @@ export const MarksEntry: React.FC = () => {
     });
 
     if (errors.length > 0) {
-      alert(errors.join('\n'));
+      toast.warning(errors.join('. '));
       return;
     }
 
@@ -328,7 +330,7 @@ export const MarksEntry: React.FC = () => {
     });
 
     if (errors.length > 0) {
-      alert(errors.join('\n'));
+      toast.warning(errors.join('. '));
       return;
     }
 
@@ -392,7 +394,7 @@ export const MarksEntry: React.FC = () => {
 
   const handleToggleAttendance = async (studentId: string, currentStatus: boolean) => {
     if (!isAuthorizedToEdit) {
-      alert("Editing is locked by the administrator.");
+      toast.warning("Editing is locked by the administrator.");
       return;
     }
     const newStatus: 'Present' | 'Absent' = currentStatus ? 'Present' : 'Absent';
@@ -469,7 +471,6 @@ export const MarksEntry: React.FC = () => {
           if (error) throw error;
           if (data && data.id) {
             insertedId = data.id;
-            // Update the generated UUID from Supabase in the state
             setDbAttendance(prev => prev.map(a => a.student_id === studentId ? { ...a, id: data.id } : a));
           }
         }
@@ -501,18 +502,17 @@ export const MarksEntry: React.FC = () => {
         }
       }
     } catch (err: any) {
-      // Revert to original state on failure
       setDbAttendance(originalAttendance);
       setLocalScores(originalScores);
       setLocalComponentScores(originalComponentScores);
       setDbMarks(originalDbMarks);
-      alert("Failed to save attendance: " + err.message);
+      toast.error("Failed to save attendance: " + err.message);
     }
   };
 
   const handleSave = async () => {
     if (!isAuthorizedToEdit) {
-      alert("Editing is locked by the administrator.");
+      toast.warning("Editing is locked by the administrator.");
       return;
     }
     setIsSaving(true);
@@ -550,7 +550,7 @@ export const MarksEntry: React.FC = () => {
             if (error) throw error;
           }
         } catch (err: any) {
-          alert(`Failed to save mark for candidate: ${err.message}`);
+          toast.error(`Failed to save mark for candidate: ${err.message}`);
           throw err;
         }
       }

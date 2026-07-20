@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { mockDb, Student, School, Scholarship, AdmitCard } from '../services/mockDb';
+import { fetchSetting, saveSetting, SignatureProfile } from '../services/settingsService';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { 
   FileText, 
   Printer, 
@@ -36,19 +38,9 @@ import {
 } from 'lucide-react';
 import { SkeletonTable } from '../components/Skeleton';
 
-interface SignatureProfile {
-  id: string;
-  session_id: string;
-  name: string;
-  designation: string;
-  signature_image: string;
-  official_seal: string;
-  institution_logo: string;
-  is_active: boolean;
-}
-
 export const AdmitCards: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const [dbScholarships, setDbScholarships] = useState<Scholarship[]>([]);
   const [dbSchools, setDbSchools] = useState<School[]>([]);
@@ -153,8 +145,8 @@ export const AdmitCards: React.FC = () => {
       setSelectedSch(localSchs[0].id);
     }
 
-    // Load settings from mockDb
-    const storedWatermark = mockDb.getSetting('watermark', {
+    // Load settings from database / settingsService
+    const storedWatermark = await fetchSetting('watermark', {
       text: 'Official',
       opacity: 0.1,
       rotation: -30,
@@ -164,7 +156,7 @@ export const AdmitCards: React.FC = () => {
     });
     setWatermark(storedWatermark);
 
-    const storedProfiles = mockDb.getSetting('signature_profiles', [
+    const storedProfiles = await fetchSetting<SignatureProfile[]>('signature_profiles', [
       {
         id: 'sig-default',
         session_id: 'default',
@@ -213,15 +205,15 @@ export const AdmitCards: React.FC = () => {
   const handleGenerateAll = async () => {
     const targetSchoolId = user?.role === 'ScholarshipCoordinator' ? user.school_id : selectedScl;
     if (!targetSchoolId) {
-      alert("Please select a school to generate admit cards.");
+      toast.warning("Please select a school to generate admit cards.");
       return;
     }
     if (!examDateInput || !examStartTime || !examEndTime) {
-      alert("Please configure the examination Date, Start Time, and End Time first.");
+      toast.warning("Please configure the examination Date, Start Time, and End Time first.");
       return;
     }
     if (studentsWithCardStatus.length === 0) {
-      alert("No students are enrolled in this school for the selected session.");
+      toast.warning("No students are enrolled in this school for the selected session.");
       return;
     }
 
@@ -300,10 +292,10 @@ export const AdmitCards: React.FC = () => {
         );
       });
 
-      alert("Admit cards generated / updated successfully.");
+      toast.success("Admit cards generated / updated successfully.");
       loadData();
     } catch (err: any) {
-      alert("Failed to generate/update admit cards: " + err.message);
+      toast.error("Failed to generate/update admit cards: " + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -314,11 +306,13 @@ export const AdmitCards: React.FC = () => {
   };
 
   // E3 & E4 settings save
-  const handleSaveSettings = () => {
-    mockDb.setSetting('watermark', watermark);
-    mockDb.setSetting('signature_profiles', sigProfiles);
+  const handleSaveSettings = async () => {
+    setIsSaving(true);
+    await saveSetting('watermark', watermark);
+    await saveSetting('signature_profiles', sigProfiles);
+    setIsSaving(false);
     setShowSettingsModal(false);
-    alert("Admit Card & Digital Signature configurations updated.");
+    toast.success("Admit Card & Digital Signature configurations saved to database successfully.");
   };
 
   // Image Upload helper
@@ -338,7 +332,7 @@ export const AdmitCards: React.FC = () => {
 
   const handleCreateProfile = () => {
     if (!newSigName.trim()) {
-      alert("Official name is required.");
+      toast.warning("Official name is required.");
       return;
     }
     const newProfile: SignatureProfile = {
@@ -358,7 +352,7 @@ export const AdmitCards: React.FC = () => {
     setNewSigLogo('');
     setNewSigImage('');
     setNewSigSeal('');
-    alert("Signature profile added. Click Save to persist changes.");
+    toast.info("Signature profile added. Click Save to persist changes.");
   };
 
   const handleSetActiveProfile = (id: string) => {
@@ -370,7 +364,7 @@ export const AdmitCards: React.FC = () => {
 
   const handleDeleteProfile = (id: string) => {
     if (sigProfiles.length <= 1) {
-      alert("At least one profile must be preserved.");
+      toast.warning("At least one profile must be preserved.");
       return;
     }
     setSigProfiles(prev => prev.filter(p => p.id !== id));

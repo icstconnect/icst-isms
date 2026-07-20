@@ -3,8 +3,10 @@ import { mockDb, Subject, Scholarship } from '../services/mockDb';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { BookOpen, Plus, BookCheck, ClipboardCopy, Pencil, Trash2, ChevronUp, ChevronDown, Layers, Loader2 } from 'lucide-react';
 import { SkeletonTable } from '../components/Skeleton';
+import { useToast } from '../context/ToastContext';
 
 export const Subjects: React.FC = () => {
+  const { toast, showConfirm } = useToast();
   const [dbScholarships, setDbScholarships] = useState<Scholarship[]>(mockDb.getData<Scholarship>('scholarships'));
   const [selectedSch, setSelectedSch] = useState('');
   const [subjects, setSubjects] = useState<Subject[]>(mockDb.getData<Subject>('subjects'));
@@ -137,7 +139,7 @@ export const Subjects: React.FC = () => {
 
     const finalFullMarks = computedFullMarks;
     if (passMarks > finalFullMarks) {
-      alert("Pass Marks cannot be greater than Full Marks.");
+      toast.warning("Pass Marks cannot be greater than Full Marks.");
       return;
     }
 
@@ -168,6 +170,7 @@ export const Subjects: React.FC = () => {
 
         mockDb.updateRecord<Subject>('subjects', editingSubject.id, subData);
         setSubjects(subjects.map(s => s.id === editingSubject.id ? { ...s, ...subData } : s));
+        toast.success("Subject updated successfully.");
       } else {
         // Add Mode
         let insertedId = `sub-${Date.now()}`;
@@ -188,43 +191,51 @@ export const Subjects: React.FC = () => {
           ...subData
         });
         setSubjects([...subjects, newSub]);
+        toast.success("Subject added successfully.");
       }
 
       setShowAddForm(false);
       resetForm();
     } catch (err: any) {
-      alert(err.message || "Failed to save subject.");
+      toast.error(err.message || "Failed to save subject.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this subject? All related candidate marks will be permanently deleted.")) return;
+  const handleDelete = (id: string) => {
+    showConfirm({
+      title: "Delete Subject?",
+      message: "Are you sure you want to delete this subject? All related candidate marks will be permanently deleted.",
+      type: 'danger',
+      confirmText: "Delete Subject",
+      onConfirm: async () => {
+        setDeletingId(id);
+        try {
+          if (isSupabaseConfigured && supabase) {
+            const { error } = await supabase
+              .from('subjects')
+              .delete()
+              .eq('id', id);
+            if (error) throw error;
+          }
 
-    setDeletingId(id);
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase
-          .from('subjects')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
+          mockDb.deleteRecord('subjects', id);
+          
+          // Clean up local mock database student marks for this subject
+          const allMarks = mockDb.getData<any>('marks');
+          const filteredMarks = allMarks.filter((m: any) => m.subject_id !== id);
+          mockDb.setData('marks', filteredMarks);
+
+          setSubjects(subjects.filter(s => s.id !== id));
+          toast.success("Subject deleted successfully.");
+        } catch (err: any) {
+          toast.error(err.message || "Failed to delete subject.");
+        } finally {
+          setDeletingId(null);
+        }
       }
-
-      mockDb.deleteRecord('subjects', id);
-      
-      // Clean up local mock database student marks for this subject
-      const allMarks = mockDb.getData<any>('marks');
-      const filteredMarks = allMarks.filter((m: any) => m.subject_id !== id);
-      mockDb.setData('marks', filteredMarks);
-
-      setSubjects(subjects.filter(s => s.id !== id));
-    } catch (err: any) {
-      alert(err.message || "Failed to delete subject.");
-    } finally {
-      setDeletingId(null);
-    }
+    });
   };
 
   const handleMoveOrder = async (sub: Subject, direction: 'up' | 'down') => {
@@ -264,21 +275,13 @@ export const Subjects: React.FC = () => {
         return s;
       }));
     } catch (err: any) {
-      alert(err.message || "Failed to reorder subjects.");
+      toast.error(err.message || "Failed to reorder subjects.");
     } finally {
       setMovingId(null);
     }
   };
 
-  const loadPredefinedWBBSE = async () => {
-    if (!selectedSch) return;
-    
-    if (activeSubjects.length > 0) {
-      if (!confirm("Add WBBSE predefined subjects? This will append to your current subject configurations.")) {
-        return;
-      }
-    }
-
+  const executeLoadWBBSE = async () => {
     const wbbseList = [
       { name: 'Bengali', display_order: activeSubjects.length + 1, full_marks: 100, pass_marks: 35, num_questions: 50, question_type: 'MCQ' as const, negative_marking: false, negative_value: 0, marks_distribution: null },
       { name: 'English', display_order: activeSubjects.length + 2, full_marks: 50, pass_marks: 18, num_questions: 25, question_type: 'MCQ' as const, negative_marking: true, negative_value: 0.25, marks_distribution: null },
@@ -288,14 +291,13 @@ export const Subjects: React.FC = () => {
     ];
 
     const insertData = wbbseList.map(item => ({
-      scholarship_id: selectedSch,
-      ...item
+      ...item,
+      scholarship_id: selectedSch
     }));
 
     setIsSaving(true);
     try {
-      let addedList: Subject[] = [];
-
+      const addedSubs: Subject[] = [];
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
           .from('subjects')
@@ -303,26 +305,43 @@ export const Subjects: React.FC = () => {
           .select();
         if (error) throw error;
         if (data) {
-          addedList = data;
+          data.forEach((subObj: any) => {
+            const added = mockDb.addRecord<Subject>('subjects', subObj);
+            addedSubs.push(added);
+          });
         }
       } else {
         insertData.forEach(item => {
-          const added = mockDb.addRecord<Subject>('subjects', item);
-          addedList.push(added);
+          const newSub = mockDb.addRecord<Subject>('subjects', {
+            id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            ...item
+          });
+          addedSubs.push(newSub);
         });
       }
 
-      if (isSupabaseConfigured && supabase) {
-        addedList.forEach(item => {
-          mockDb.addRecord<Subject>('subjects', item);
-        });
-      }
-
-      setSubjects([...subjects, ...addedList]);
+      setSubjects([...subjects, ...addedSubs]);
+      toast.success("WBBSE predefined subjects appended successfully.");
     } catch (err: any) {
-      alert(err.message || "Failed to load predefined subjects.");
+      toast.error(err.message || "Failed to load predefined subjects.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const loadPredefinedWBBSE = () => {
+    if (!selectedSch) return;
+    
+    if (activeSubjects.length > 0) {
+      showConfirm({
+        title: "Load Predefined WBBSE Subjects?",
+        message: "Add WBBSE predefined subjects? This will append to your current subject configurations.",
+        type: 'info',
+        confirmText: "Append WBBSE Subjects",
+        onConfirm: executeLoadWBBSE
+      });
+    } else {
+      executeLoadWBBSE();
     }
   };
 
