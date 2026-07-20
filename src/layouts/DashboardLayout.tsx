@@ -194,7 +194,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Navbar */}
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 z-10 flex-shrink-0 no-print">
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 sm:px-6 z-10 flex-shrink-0 no-print">
           <div className="flex items-center space-x-3 flex-1">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -202,9 +202,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="flex items-center space-x-2 mr-4">
+            <div className="flex items-center space-x-2 mr-2">
               <img src="/logo.png" alt="ICST Logo" className="w-8 h-8 object-contain rounded" />
-              <span className="font-extrabold text-sm text-slate-800 tracking-tight">ICST ISMS</span>
+              <span className="font-extrabold text-sm text-slate-800 tracking-tight hidden sm:inline">ICST ISMS</span>
             </div>
             
             {/* Global Search Input */}
@@ -267,18 +267,18 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           <div className="flex items-center space-x-4">
             {/* Quick Testing: Mock Role Switcher (Hidden in Production if Supabase is active) */}
             {user && (
-              <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                <ShieldAlert className="w-4 h-4 text-orange-500" />
-                <span className="text-xs font-semibold text-slate-600">Dev Mode:</span>
+              <div className="flex items-center space-x-1.5 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                <ShieldAlert className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden lg:inline">Dev Mode:</span>
                 <select
                   value={user.role}
                   onChange={(e) => switchRole(e.target.value as Profile['role'])}
-                  className="text-xs bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer"
+                  className="text-[11px] bg-transparent font-bold text-slate-700 focus:outline-none cursor-pointer"
                 >
                   <option value="SuperAdmin">Super Admin</option>
                   <option value="Admin">Admin</option>
                   <option value="ScholarshipCoordinator">Coordinator</option>
-                  <option value="MarksEvaluator">Marks Evaluator</option>
+                  <option value="MarksEvaluator">Evaluator</option>
                   <option value="Invigilator">Invigilator</option>
                   <option value="DataEntryOperator">Data Entry</option>
                   <option value="Viewer">Viewer</option>
@@ -302,7 +302,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         </header>
 
         {/* Dashboard Main Scrollable Panel */}
-        <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-50">
           {children}
         </main>
       </div>

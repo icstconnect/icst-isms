@@ -579,103 +579,105 @@ export const Subjects: React.FC = () => {
             <SkeletonTable rows={4} cols={5} />
           </div>
         ) : activeSubjects.length > 0 ? (
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 font-semibold text-slate-600">Order</th>
-                <th className="p-4 font-semibold text-slate-600">Subject Name</th>
-                <th className="p-4 font-semibold text-slate-600">Type</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Full Marks</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Pass Marks</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Questions</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Negative Deduction</th>
-                <th className="p-4 font-semibold text-slate-600 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {activeSubjects.map((sub, index) => (
-                <tr key={sub.id} className="hover:bg-slate-50/50">
-                  <td className="p-4 font-mono font-bold text-slate-400">#{sub.display_order}</td>
-                  <td className="p-4">
-                    <div className="font-bold text-slate-800 flex items-center">
-                      <BookCheck className="w-4 h-4 mr-2 text-blue-600" />
-                      {sub.name}
-                    </div>
-                    {sub.marks_distribution && sub.marks_distribution.length > 0 && (
-                      <div className="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-1.5 pl-6">
-                        {sub.marks_distribution.map((item, dIdx) => (
-                          <span key={dIdx} className="bg-slate-100 px-1.5 py-0.5 rounded font-medium border border-slate-200/50">
-                            {item.name}: {item.max_marks}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-4 text-slate-500">{sub.question_type}</td>
-                  <td className="p-4 text-center font-semibold text-slate-700">{sub.full_marks}</td>
-                  <td className="p-4 text-center text-slate-600">{sub.pass_marks}</td>
-                  <td className="p-4 text-center text-slate-600">{sub.num_questions}</td>
-                  <td className="p-4 text-center">
-                    {sub.negative_marking ? (
-                      <span className="text-orange-600 font-bold text-xs bg-orange-50 px-2.5 py-0.5 rounded border border-orange-100">
-                        -{sub.negative_value}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">-</span>
-                    )}
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex justify-end items-center space-x-1.5">
-                      <button
-                        onClick={() => handleMoveOrder(sub, 'up')}
-                        disabled={index === 0 || movingId !== null}
-                        title="Move Up"
-                        className="p-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-30 rounded border border-slate-200 text-slate-500 cursor-pointer"
-                      >
-                        {movingId === sub.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
-                        ) : (
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleMoveOrder(sub, 'down')}
-                        disabled={index === activeSubjects.length - 1 || movingId !== null}
-                        title="Move Down"
-                        className="p-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-30 rounded border border-slate-200 text-slate-500 cursor-pointer"
-                      >
-                        {movingId === sub.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleStartEdit(sub)}
-                        disabled={isSaving || deletingId !== null || movingId !== null}
-                        title="Edit Subject"
-                        className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm ml-1 disabled:opacity-50"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(sub.id)}
-                        disabled={deletingId !== null}
-                        title="Delete Subject"
-                        className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm disabled:opacity-50"
-                      >
-                        {deletingId === sub.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="p-4 font-semibold text-slate-600">Order</th>
+                  <th className="p-4 font-semibold text-slate-600">Subject Name</th>
+                  <th className="p-4 font-semibold text-slate-600">Type</th>
+                  <th className="p-4 font-semibold text-slate-600 text-center">Full Marks</th>
+                  <th className="p-4 font-semibold text-slate-600 text-center">Pass Marks</th>
+                  <th className="p-4 font-semibold text-slate-600 text-center">Questions</th>
+                  <th className="p-4 font-semibold text-slate-600 text-center">Negative Deduction</th>
+                  <th className="p-4 font-semibold text-slate-600 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {activeSubjects.map((sub, index) => (
+                  <tr key={sub.id} className="hover:bg-slate-50/50">
+                    <td className="p-4 font-mono font-bold text-slate-400">#{sub.display_order}</td>
+                    <td className="p-4">
+                      <div className="font-bold text-slate-800 flex items-center">
+                        <BookCheck className="w-4 h-4 mr-2 text-blue-600" />
+                        {sub.name}
+                      </div>
+                      {sub.marks_distribution && sub.marks_distribution.length > 0 && (
+                        <div className="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-1.5 pl-6">
+                          {sub.marks_distribution.map((item, dIdx) => (
+                            <span key={dIdx} className="bg-slate-100 px-1.5 py-0.5 rounded font-medium border border-slate-200/50">
+                              {item.name}: {item.max_marks}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-4 text-slate-500">{sub.question_type}</td>
+                    <td className="p-4 text-center font-semibold text-slate-700">{sub.full_marks}</td>
+                    <td className="p-4 text-center text-slate-600">{sub.pass_marks}</td>
+                    <td className="p-4 text-center text-slate-600">{sub.num_questions}</td>
+                    <td className="p-4 text-center">
+                      {sub.negative_marking ? (
+                        <span className="text-orange-600 font-bold text-xs bg-orange-50 px-2.5 py-0.5 rounded border border-orange-100">
+                          -{sub.negative_value}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end items-center space-x-1.5">
+                        <button
+                          onClick={() => handleMoveOrder(sub, 'up')}
+                          disabled={index === 0 || movingId !== null}
+                          title="Move Up"
+                          className="p-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-30 rounded border border-slate-200 text-slate-500 cursor-pointer"
+                        >
+                          {movingId === sub.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                          ) : (
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleMoveOrder(sub, 'down')}
+                          disabled={index === activeSubjects.length - 1 || movingId !== null}
+                          title="Move Down"
+                          className="p-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-30 rounded border border-slate-200 text-slate-500 cursor-pointer"
+                        >
+                          {movingId === sub.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleStartEdit(sub)}
+                          disabled={isSaving || deletingId !== null || movingId !== null}
+                          title="Edit Subject"
+                          className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 border border-slate-200 cursor-pointer shadow-sm ml-1 disabled:opacity-50"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(sub.id)}
+                          disabled={deletingId !== null}
+                          title="Delete Subject"
+                          className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 hover:text-red-700 border border-red-100 cursor-pointer shadow-sm disabled:opacity-50"
+                        >
+                          {deletingId === sub.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="p-12 text-center text-slate-400 flex flex-col items-center">
             <BookOpen className="w-12 h-12 text-slate-200 mb-2" />

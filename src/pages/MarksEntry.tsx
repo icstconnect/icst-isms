@@ -471,93 +471,95 @@ export const MarksEntry: React.FC = () => {
             <SkeletonTable rows={5} cols={6} />
           </div>
         ) : studentRows.length > 0 ? (
-          <table className="w-full text-left border-collapse text-xs table-auto">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-2 py-3 font-semibold text-slate-600">Candidate Name</th>
-                <th className="p-2 py-3 font-semibold text-slate-600 text-center">Exam Roll</th>
-                <th className="p-2 py-3 font-semibold text-slate-600 text-center">Attendance</th>
-                {subjects.map(sub => (
-                  <th key={sub.id} className="p-2 py-3 font-semibold text-slate-600 text-center">
-                    {sub.name} (Max: {sub.full_marks})
-                  </th>
-                ))}
-                <th className="p-2 py-3 font-semibold text-slate-600 text-center font-bold">Total</th>
-                <th className="p-2 py-3 font-semibold text-slate-600 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {studentRows.map(row => {
-                const summary = getStudentTotalAndStatus(row.student.id, row.marksMap);
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs table-auto">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="p-2 py-3 font-semibold text-slate-600">Candidate Name</th>
+                  <th className="p-2 py-3 font-semibold text-slate-600 text-center">Exam Roll</th>
+                  <th className="p-2 py-3 font-semibold text-slate-600 text-center">Attendance</th>
+                  {subjects.map(sub => (
+                    <th key={sub.id} className="p-2 py-3 font-semibold text-slate-600 text-center">
+                      {sub.name} (Max: {sub.full_marks})
+                    </th>
+                  ))}
+                  <th className="p-2 py-3 font-semibold text-slate-600 text-center font-bold">Total</th>
+                  <th className="p-2 py-3 font-semibold text-slate-600 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {studentRows.map(row => {
+                  const summary = getStudentTotalAndStatus(row.student.id, row.marksMap);
 
-                return (
-                  <tr key={row.student.id} className="hover:bg-slate-50/50">
-                    <td className="p-2 py-2.5">
-                      <div className="font-bold text-slate-800 text-xs">{row.student.name}</div>
-                      <div className="text-[10px] text-slate-400">ID: {row.student.student_id}</div>
-                    </td>
-                    <td className="p-2 py-2.5 text-center font-mono font-bold text-slate-700 text-xs">
-                      {row.admitCard ? row.admitCard.roll_number : (
-                        <span className="text-[10px] text-red-500 font-semibold bg-red-50 px-1.5 py-0.5 rounded">No Card</span>
-                      )}
-                    </td>
-                    <td className="p-2 py-2.5 text-center">
-                      <button
-                        disabled={!isAuthorizedToEdit}
-                        onClick={() => handleToggleAttendance(row.student.id, row.isAbsent)}
-                        className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer ${
-                          row.isAbsent 
-                            ? 'bg-red-50 text-red-600 border-red-200' 
-                            : 'bg-green-50 text-green-600 border-green-200'
-                        }`}
-                      >
-                        {row.isAbsent ? 'ABSENT' : 'PRESENT'}
-                      </button>
-                    </td>
-                    {subjects.map(sub => {
-                      const savedScore = row.marksMap[sub.id]?.score;
-                      const currentScore = getSubjectScore(row.student.id, sub.id, savedScore);
+                  return (
+                    <tr key={row.student.id} className="hover:bg-slate-50/50">
+                      <td className="p-2 py-2.5">
+                        <div className="font-bold text-slate-800 text-xs">{row.student.name}</div>
+                        <div className="text-[10px] text-slate-400">ID: {row.student.student_id}</div>
+                      </td>
+                      <td className="p-2 py-2.5 text-center font-mono font-bold text-slate-700 text-xs">
+                        {row.admitCard ? row.admitCard.roll_number : (
+                          <span className="text-[10px] text-red-500 font-semibold bg-red-50 px-1.5 py-0.5 rounded">No Card</span>
+                        )}
+                      </td>
+                      <td className="p-2 py-2.5 text-center">
+                        <button
+                          disabled={!isAuthorizedToEdit}
+                          onClick={() => handleToggleAttendance(row.student.id, row.isAbsent)}
+                          className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer ${
+                            row.isAbsent 
+                              ? 'bg-red-50 text-red-600 border-red-200' 
+                              : 'bg-green-50 text-green-600 border-green-200'
+                          }`}
+                        >
+                          {row.isAbsent ? 'ABSENT' : 'PRESENT'}
+                        </button>
+                      </td>
+                      {subjects.map(sub => {
+                        const savedScore = row.marksMap[sub.id]?.score;
+                        const currentScore = getSubjectScore(row.student.id, sub.id, savedScore);
 
-                      return (
-                        <td key={sub.id} className="p-2 py-2.5 text-center">
-                          <input
-                            type="number"
-                            disabled={row.isAbsent || !isAuthorizedToEdit || !row.admitCard}
-                            placeholder={row.isAbsent ? 'AB' : 'Score'}
-                            value={currentScore === null ? '' : currentScore}
-                            onChange={(e) => handleScoreChange(row.student.id, sub.id, e.target.value, row.isAbsent, sub.full_marks)}
-                            className="w-14 text-center border border-slate-200 p-1 text-xs rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-extrabold text-slate-800 disabled:opacity-50"
-                          />
-                        </td>
-                      );
-                    })}
-                    <td className="p-2 py-2.5 text-center font-bold text-slate-700 text-xs">
-                      {row.isAbsent ? (
-                        <span className="text-[10px] text-slate-400 font-normal">AB</span>
-                      ) : summary.hasAnyMark ? (
-                        `${summary.totalObtained}/${summary.totalFull}`
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="p-2 py-2.5 text-center">
-                      {row.isAbsent ? (
-                        <span className="text-red-600 font-bold text-[10px] bg-red-50 px-2 py-0.5 rounded">ABSENT</span>
-                      ) : summary.hasAnyMark ? (
-                        summary.passedAll ? (
-                          <span className="text-green-600 font-bold text-[10px] bg-green-50 px-2 py-0.5 rounded">PASS</span>
+                        return (
+                          <td key={sub.id} className="p-2 py-2.5 text-center">
+                            <input
+                              type="number"
+                              disabled={row.isAbsent || !isAuthorizedToEdit || !row.admitCard}
+                              placeholder={row.isAbsent ? 'AB' : 'Score'}
+                              value={currentScore === null ? '' : currentScore}
+                              onChange={(e) => handleScoreChange(row.student.id, sub.id, e.target.value, row.isAbsent, sub.full_marks)}
+                              className="w-14 text-center border border-slate-200 p-1 text-xs rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-extrabold text-slate-800 disabled:opacity-50"
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="p-2 py-2.5 text-center font-bold text-slate-700 text-xs">
+                        {row.isAbsent ? (
+                          <span className="text-[10px] text-slate-400 font-normal">AB</span>
+                        ) : summary.hasAnyMark ? (
+                          `${summary.totalObtained}/${summary.totalFull}`
                         ) : (
-                          <span className="text-red-600 font-bold text-[10px] bg-red-50 px-2 py-0.5 rounded">FAIL</span>
-                        )
-                      ) : (
-                        <span className="text-slate-400 text-[10px]">-</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                          '-'
+                        )}
+                      </td>
+                      <td className="p-2 py-2.5 text-center">
+                        {row.isAbsent ? (
+                          <span className="text-red-600 font-bold text-[10px] bg-red-50 px-2 py-0.5 rounded">ABSENT</span>
+                        ) : summary.hasAnyMark ? (
+                          summary.passedAll ? (
+                            <span className="text-green-600 font-bold text-[10px] bg-green-50 px-2 py-0.5 rounded">PASS</span>
+                          ) : (
+                            <span className="text-red-600 font-bold text-[10px] bg-red-50 px-2 py-0.5 rounded">FAIL</span>
+                          )
+                        ) : (
+                          <span className="text-slate-400 text-[10px]">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="p-12 text-center text-slate-400">
             No students registered in this school for this scholarship session.

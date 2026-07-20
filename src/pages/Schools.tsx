@@ -765,178 +765,180 @@ export const Schools: React.FC = () => {
             <SkeletonTable rows={5} cols={6} />
           </div>
         ) : filteredSchools.length > 0 ? (
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 font-semibold text-slate-600">School ID</th>
-                <th className="p-4 font-semibold text-slate-600">School Name</th>
-                <th className="p-4 font-semibold text-slate-600">UDISE</th>
-                <th className="p-4 font-semibold text-slate-600">Status</th>
-                <th className="p-4 font-semibold text-slate-600 text-center">Analytics</th>
-                <th className="p-4 font-semibold text-slate-600">Contact Details</th>
-                <th className="p-4 font-semibold text-slate-600 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredSchools.map(s => {
-                const isApproved = s.status === 'Approved';
-                const isPending = s.status === 'Pending Review' || !s.status;
-                const isRejected = s.status === 'Rejected';
-                const isSuspended = s.status === 'Suspended';
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="p-4 font-semibold text-slate-600">School ID</th>
+                  <th className="p-4 font-semibold text-slate-600">School Name</th>
+                  <th className="p-4 font-semibold text-slate-600">UDISE</th>
+                  <th className="p-4 font-semibold text-slate-600">Status</th>
+                  <th className="p-4 font-semibold text-slate-600 text-center">Analytics</th>
+                  <th className="p-4 font-semibold text-slate-600">Contact Details</th>
+                  <th className="p-4 font-semibold text-slate-600 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredSchools.map(s => {
+                  const isApproved = s.status === 'Approved';
+                  const isPending = s.status === 'Pending Review' || !s.status;
+                  const isRejected = s.status === 'Rejected';
+                  const isSuspended = s.status === 'Suspended';
 
-                return (
-                  <tr key={s.id} className="hover:bg-slate-50/50">
-                    <td className="p-4 font-mono font-bold text-slate-400">{s.school_id}</td>
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800">{s.name}</div>
-                      <div className="text-xs text-slate-400 flex items-center mt-0.5">
-                        <MapPin className="w-3.5 h-3.5 mr-1 text-slate-300" />
-                        {s.block}, {s.district} - {s.pin}
-                      </div>
-                    </td>
-                    <td className="p-4 font-mono text-slate-600">{s.udise}</td>
-                    <td className="p-4">
-                      <div className="flex flex-col space-y-1">
-                        <div className="flex items-center space-x-1.5">
-                          {isApproved && (
-                            <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200 flex items-center">
-                              <CheckCircle className="w-3 h-3 mr-1" /> Approved
-                            </span>
-                          )}
-                          {isPending && (
-                            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center">
-                              <AlertTriangle className="w-3 h-3 mr-1" /> Pending
-                            </span>
-                          )}
-                          {isRejected && (
-                            <span className="text-xs font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200 flex items-center" title={s.rejection_reason}>
-                              <XCircle className="w-3 h-3 mr-1" /> Rejected
-                            </span>
-                          )}
-                          {isSuspended && (
-                            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 flex items-center">
-                              <Ban className="w-3 h-3 mr-1" /> Suspended
-                            </span>
-                          )}
-                          <button
-                            onClick={() => setHistoryModalSchool(s)}
-                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600 transition-colors"
-                            title="View Approval History Log"
-                          >
-                            <ClipboardList className="w-3.5 h-3.5" />
-                          </button>
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50/50">
+                      <td className="p-4 font-mono font-bold text-slate-400">{s.school_id}</td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{s.name}</div>
+                        <div className="text-xs text-slate-400 flex items-center mt-0.5">
+                          <MapPin className="w-3.5 h-3.5 mr-1 text-slate-300" />
+                          {s.block}, {s.district} - {s.pin}
                         </div>
-                        {isRejected && s.rejection_reason && (
-                          <span className="text-[10px] text-red-500 italic max-w-[150px] truncate block" title={s.rejection_reason}>
-                            Reason: {s.rejection_reason}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4 text-center">
-                      <button
-                        onClick={() => setAnalyticsSchool(s)}
-                        className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg shadow-sm cursor-pointer inline-flex items-center"
-                      >
-                        <TrendingUp className="w-3.5 h-3.5 mr-1" />
-                        Dashboard
-                      </button>
-                    </td>
-                    <td className="p-4 text-slate-500">
-                      <div className="flex items-center text-xs">
-                        <Phone className="w-3.5 h-3.5 mr-1.5 text-slate-300" />
-                        {s.contact_number}
-                      </div>
-                      <div className="flex items-center text-xs mt-1">
-                        <Mail className="w-3.5 h-3.5 mr-1.5 text-slate-300" />
-                        {s.email}
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex justify-end items-center space-x-1.5">
-                        {/* Status workflow triggers for Admins */}
-                        {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
-                          <>
+                      </td>
+                      <td className="p-4 font-mono text-slate-600">{s.udise}</td>
+                      <td className="p-4">
+                        <div className="flex flex-col space-y-1">
+                          <div className="flex items-center space-x-1.5">
+                            {isApproved && (
+                              <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200 flex items-center">
+                                <CheckCircle className="w-3 h-3 mr-1" /> Approved
+                              </span>
+                            )}
                             {isPending && (
-                              <>
+                              <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center">
+                                <AlertTriangle className="w-3 h-3 mr-1" /> Pending
+                              </span>
+                            )}
+                            {isRejected && (
+                              <span className="text-xs font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200 flex items-center" title={s.rejection_reason}>
+                                <XCircle className="w-3 h-3 mr-1" /> Rejected
+                              </span>
+                            )}
+                            {isSuspended && (
+                              <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 flex items-center">
+                                <Ban className="w-3 h-3 mr-1" /> Suspended
+                              </span>
+                            )}
+                            <button
+                              onClick={() => setHistoryModalSchool(s)}
+                              className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600 transition-colors"
+                              title="View Approval History Log"
+                            >
+                              <ClipboardList className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          {isRejected && s.rejection_reason && (
+                            <span className="text-[10px] text-red-500 italic max-w-[150px] truncate block" title={s.rejection_reason}>
+                              Reason: {s.rejection_reason}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={() => setAnalyticsSchool(s)}
+                          className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg shadow-sm cursor-pointer inline-flex items-center"
+                        >
+                          <TrendingUp className="w-3.5 h-3.5 mr-1" />
+                          Dashboard
+                        </button>
+                      </td>
+                      <td className="p-4 text-slate-500">
+                        <div className="flex items-center text-xs">
+                          <Phone className="w-3.5 h-3.5 mr-1.5 text-slate-300" />
+                          {s.contact_number}
+                        </div>
+                        <div className="flex items-center text-xs mt-1">
+                          <Mail className="w-3.5 h-3.5 mr-1.5 text-slate-300" />
+                          {s.email}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end items-center space-x-1.5">
+                          {/* Status workflow triggers for Admins */}
+                          {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
+                            <>
+                              {isPending && (
+                                <>
+                                  <button
+                                    onClick={() => handleStatusChange(s, 'Approved')}
+                                    title="Approve School"
+                                    className="p-1.5 bg-green-50 hover:bg-green-100 rounded-lg text-green-600 border border-green-200 cursor-pointer shadow-sm"
+                                  >
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setRejectionModalSchool(s);
+                                      setRejectionReason('');
+                                    }}
+                                    title="Reject School"
+                                    className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-600 border border-red-200 cursor-pointer shadow-sm"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+                              {isApproved && (
                                 <button
-                                  onClick={() => handleStatusChange(s, 'Approved')}
+                                  onClick={() => handleStatusChange(s, 'Suspended', 'Administrative suspension')}
+                                  title="Suspend School"
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 border border-slate-300 cursor-pointer shadow-sm"
+                                >
+                                  <Ban className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {isSuspended && (
+                                <button
+                                  onClick={() => handleStatusChange(s, 'Approved', 'Administrative reactivation')}
+                                  title="Reactivate School"
+                                  className="p-1.5 bg-green-50 hover:bg-green-100 rounded-lg text-green-600 border border-green-200 cursor-pointer shadow-sm"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {isRejected && (
+                                <button
+                                  onClick={() => handleStatusChange(s, 'Approved', 'Approved after verification')}
                                   title="Approve School"
                                   className="p-1.5 bg-green-50 hover:bg-green-100 rounded-lg text-green-600 border border-green-200 cursor-pointer shadow-sm"
                                 >
                                   <CheckCircle className="w-3.5 h-3.5" />
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    setRejectionModalSchool(s);
-                                    setRejectionReason('');
-                                  }}
-                                  title="Reject School"
-                                  className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-600 border border-red-200 cursor-pointer shadow-sm"
-                                >
-                                  <XCircle className="w-3.5 h-3.5" />
-                                </button>
-                              </>
-                            )}
-                            {isApproved && (
-                              <button
-                                onClick={() => handleStatusChange(s, 'Suspended', 'Administrative suspension')}
-                                title="Suspend School"
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 border border-slate-300 cursor-pointer shadow-sm"
-                              >
-                                <Ban className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            {isSuspended && (
-                              <button
-                                onClick={() => handleStatusChange(s, 'Approved', 'Administrative reactivation')}
-                                title="Reactivate School"
-                                className="p-1.5 bg-green-50 hover:bg-green-100 rounded-lg text-green-600 border border-green-200 cursor-pointer shadow-sm"
-                              >
-                                <RefreshCw className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            {isRejected && (
-                              <button
-                                onClick={() => handleStatusChange(s, 'Approved', 'Approved after verification')}
-                                title="Approve School"
-                                className="p-1.5 bg-green-50 hover:bg-green-100 rounded-lg text-green-600 border border-green-200 cursor-pointer shadow-sm"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </>
-                        )}
+                              )}
+                            </>
+                          )}
 
-                        <button
-                          onClick={() => handleStartEdit(s)}
-                          disabled={isSaving || deletingId !== null}
-                          title="Edit School details"
-                          className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 border border-slate-200 cursor-pointer shadow-sm disabled:opacity-50"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
                           <button
-                            onClick={() => handleDelete(s.id)}
-                            disabled={deletingId !== null}
-                            title="Delete School"
-                            className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 border border-red-100 cursor-pointer shadow-sm disabled:opacity-50"
+                            onClick={() => handleStartEdit(s)}
+                            disabled={isSaving || deletingId !== null}
+                            title="Edit School details"
+                            className="p-1.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500 border border-slate-200 cursor-pointer shadow-sm disabled:opacity-50"
                           >
-                            {deletingId === s.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-3.5 h-3.5" />
-                            )}
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                          {user && (user.role === 'SuperAdmin' || user.role === 'Admin') && (
+                            <button
+                              onClick={() => handleDelete(s.id)}
+                              disabled={deletingId !== null}
+                              title="Delete School"
+                              className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-500 border border-red-100 cursor-pointer shadow-sm disabled:opacity-50"
+                            >
+                              {deletingId === s.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="p-12 text-center text-slate-400">
             No registered schools found matching the current search parameters.
