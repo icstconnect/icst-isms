@@ -236,8 +236,10 @@ export const AdmitCards: React.FC = () => {
           newCardsCount++;
         }
 
+        const cardId = hasCard ? item.card!.id : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ac-${Date.now()}-${Math.random()}`);
+
         return {
-          ...(hasCard ? { id: item.card!.id } : {}),
+          id: cardId,
           student_id: item.student.id,
           roll_number: rollNumber,
           exam_date: examDateInput,
